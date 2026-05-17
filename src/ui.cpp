@@ -244,13 +244,19 @@ void Canvas::Draw()
 void Canvas::InstanceBlock(const Block &block)
 {
     m_Blocks.emplace_back(block, m_NextId++, true);
-
     BlockInstance &instance = m_Blocks.back();
-    uint32_t id = m_Blocks.back().GetId();
-    instance.OnDelete = [this, id] { DeleteInstance(id); };
-    instance.OnStartDrag = [this, id] { BringToFront(id); };
+    SetInstanceCallbacks(instance);
 
-    LOG_DEBUG("instanced block with id %u", id);
+    LOG_DEBUG("created instanced with id %u", instance.GetId());
+}
+
+void Canvas::DuplicateInstance(const BlockInstance &original)
+{
+    m_Blocks.emplace_back(original, m_NextId++, ImVec2(original.GetPos().x + 100.0, original.GetPos().y + 100.0));
+    BlockInstance &instance = m_Blocks.back();
+    SetInstanceCallbacks(instance);
+
+    LOG_DEBUG("duplicated instance with id %u", original.GetId());
 }
 
 void Canvas::DeleteInstance(uint32_t id)
@@ -288,6 +294,14 @@ void Canvas::BringToFront(uint32_t id)
     }
 
     std::swap(m_Blocks[idx], m_Blocks.back());
+}
+
+void Canvas::SetInstanceCallbacks(BlockInstance &instance)
+{
+    uint32_t id = m_Blocks.back().GetId();
+    instance.OnDelete = [this, id] { DeleteInstance(id); };
+    instance.OnDuplicate = [this, &instance] { DuplicateInstance(instance); };
+    instance.OnStartDrag = [this, id] { BringToFront(id); };
 }
 
 static BlockToken parseBlockInput(const char **ch, const char * end)
@@ -505,6 +519,14 @@ BlockInstance::BlockInstance(const Block &block, uint32_t id, bool isDragging)
     m_IsDragging = isDragging;
 }
 
+BlockInstance::BlockInstance(const BlockInstance &instance, uint32_t id, const ImVec2 &pos)
+    : BlockInstance(instance)
+{
+    m_Id = id;
+    m_Pos = pos;
+    m_IsDragging = false;
+}
+
 void BlockInstance::Update()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -543,6 +565,7 @@ void BlockInstance::Draw()
 
     if (ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right)) {
         if (ImGui::MenuItem("Delete")) OnDelete();
+        if (ImGui::MenuItem("Duplicate")) OnDuplicate();
         ImGui::EndPopup();
     }
 

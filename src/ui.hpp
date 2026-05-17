@@ -78,16 +78,20 @@ class Block
 class BlockInstance : public Block
 {
     public:
+        BlockInstance(const BlockInstance &instance) = default;
+        ~BlockInstance() = default;
+
         BlockInstance(const BlockDefinition *definition) : Block(definition) {}
         BlockInstance(const Block &block, uint32_t id, bool isDragging = false);
-        ~BlockInstance() = default;
+        BlockInstance(const BlockInstance &instance, uint32_t id, const ImVec2 &pos);
 
         void Update() override;
         void Draw() override;
 
-        uint32_t GetId() { return m_Id; };
+        uint32_t GetId() const { return m_Id; };
 
         std::function<void ()> OnDelete;
+        std::function<void ()> OnDuplicate;
 
     private:
         uint32_t m_Id;
@@ -123,6 +127,10 @@ class Canvas
         void InstanceBlock(const Block &block);
         void DeleteInstance(uint32_t id);
         void BringToFront(uint32_t id);
+        void DuplicateInstance(const BlockInstance &original);
+
+    private:
+        void SetInstanceCallbacks(BlockInstance &instance);
 
     private:
         std::vector<BlockInstance> m_Blocks;
