@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <functional>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -48,17 +49,44 @@ class Block
         Block(const BlockDefinition* definition);
         ~Block() = default;
 
-        void Update();
-        void Draw();
-        bool IsHovered();
+        virtual void Update();
+        virtual void Draw();
 
-    private:
+        bool IsHovered();
+        bool IsMouseDown();
+
+        const BlockDefinition *GetDefinition() const { return m_Definition; }
+        const std::vector<BlockToken> &GetTokens() const { return m_Tokens; }
+        const ImVec2 &GetPos() const { return m_Pos; }
+        const ImVec2 &GetSize() const { return m_Size; }
+
+        std::function<void ()> OnStartDrag;
+
+    protected:
+        ImVec2 GetPosInShape();
+        void UpdateSize();
+
+    protected:
         ImVec2 m_Pos;
         ImVec2 m_Size;
+        bool m_IsDragging = false;
 
         const BlockDefinition *m_Definition;
         std::vector<BlockToken> m_Tokens;
+};
 
+class BlockInstance : public Block
+{
+    public:
+        BlockInstance(const BlockDefinition *definition) : Block(definition) {}
+        BlockInstance(const Block &block, bool isDragging = false);
+        ~BlockInstance() = default;
+
+        void Update() override;
+        void Draw() override;
+
+    private:
+        ImVec2 m_DragOffset;
 };
 
 class Sidebar
@@ -71,8 +99,26 @@ class Sidebar
         void Update();
         void Draw();
 
+        std::function<void(const Block &block)> OnCreateBlock;
+
     private:
         std::vector<Block> m_Blocks;
+};
+
+class Canvas
+{
+    public:
+        Canvas() = default;
+        ~Canvas() = default;
+
+        void Init();
+        void Update();
+        void Draw();
+
+        void InstanceBlock(const Block &block);
+
+    private:
+        std::vector<BlockInstance> m_Blocks;
 };
 
 class UI
@@ -94,13 +140,14 @@ class UI
 
         void DrawMainMenuBar();
         void DrawWorkspace();
-        void DrawCanvas();
         void DrawOutputPanel();
 
     private:
         GLFWwindow *m_Window = nullptr;
 
         Sidebar m_Sidebar;
+        Canvas m_Canvas;
+
         bool m_ShowSidebar = true;
         bool m_ShowOutputPanel = false;
 };

@@ -20,4 +20,3 @@ inline constexpr float BLOCK_INT_INPUT_MAXW = 40.0f;
 inline constexpr float BLOCK_FLOAT_INPUT_MAXW = 60.0f;
 
 inline constexpr float OUTPUT_PANEL_HEIGHT = 220.0f;
-
