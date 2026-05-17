@@ -40,7 +40,6 @@ void UI::Init()
 
     m_Sidebar.OnCreateBlock = [&](const Block &block) {
         m_Canvas.InstanceBlock(block);
-        LOG_DEBUG("Created Block");
     };
 }
 
@@ -244,7 +243,51 @@ void Canvas::Draw()
 
 void Canvas::InstanceBlock(const Block &block)
 {
-    m_Blocks.emplace_back(block, true);
+    m_Blocks.emplace_back(block, m_NextId++, true);
+
+    BlockInstance &instance = m_Blocks.back();
+    uint32_t id = m_Blocks.back().GetId();
+    instance.OnDelete = [this, id] { DeleteInstance(id); };
+    instance.OnStartDrag = [this, id] { BringToFront(id); };
+
+    LOG_DEBUG("instanced block with id %u", id);
+}
+
+void Canvas::DeleteInstance(uint32_t id)
+{
+    int32_t idx = -1;
+    for (size_t i = 0; i < m_Blocks.size(); i ++) {
+        if (id == m_Blocks[i].GetId()) {
+            idx = i;
+            break;
+        }
+    }
+
+    if (idx == -1) {
+        LOG_ERROR("failed to find block with id %u", id);
+        return;
+    }
+
+    m_Blocks.erase(m_Blocks.begin() + idx);
+    LOG_DEBUG("deleted block with id %u", id);
+}
+
+void Canvas::BringToFront(uint32_t id)
+{
+    int32_t idx = -1;
+    for (size_t i = 0; i < m_Blocks.size(); i ++) {
+        if (id == m_Blocks[i].GetId()) {
+            idx = i;
+            break;
+        }
+    }
+
+    if (idx == -1) {
+        LOG_ERROR("failed to find block with id %u", id);
+        return;
+    }
+
+    std::swap(m_Blocks[idx], m_Blocks.back());
 }
 
 static BlockToken parseBlockInput(const char **ch, const char * end)
@@ -452,8 +495,9 @@ void Block::UpdateSize()
     m_Size = ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH), BLOCK_HEIGHT);
 }
 
-BlockInstance::BlockInstance(const Block &block,  bool isDragging)
-    : Block(block.GetDefinition())
+BlockInstance::BlockInstance(const Block &block, uint32_t id, bool isDragging)
+    : Block(block.GetDefinition()),
+      m_Id(id)
 {
     m_Tokens = block.GetTokens();
     m_Pos = block.GetPos();
@@ -469,6 +513,7 @@ void BlockInstance::Update()
     if (!m_IsDragging && IsHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_IsDragging = true;
         m_DragOffset = ImVec2(mousePos.x - m_Pos.x, mousePos.y - m_Pos.y);
+        OnStartDrag();
     }
 
     if (m_IsDragging) {
@@ -484,7 +529,7 @@ void BlockInstance::Update()
 void BlockInstance::Draw()
 {
     assert(m_Definition != nullptr);
-    ImGui::PushID(static_cast<int>(m_Definition->type));
+    ImGui::PushID(m_Id);
 
     UpdateSize();
 
@@ -492,5 +537,16 @@ void BlockInstance::Draw()
     drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y);
     drawBlockTokens(GetPosInShape(), m_Tokens);
 
+    // Create an invisible button covering the whole block
+    ImGui::SetCursorScreenPos(m_Pos);
+    ImGui::InvisibleButton("BlockClickable", m_Size);
+
+    if (ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right)) {
+        if (ImGui::MenuItem("Delete")) OnDelete();
+        ImGui::EndPopup();
+    }
+
+
     ImGui::PopID();
 }
+

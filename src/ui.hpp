@@ -79,13 +79,18 @@ class BlockInstance : public Block
 {
     public:
         BlockInstance(const BlockDefinition *definition) : Block(definition) {}
-        BlockInstance(const Block &block, bool isDragging = false);
+        BlockInstance(const Block &block, uint32_t id, bool isDragging = false);
         ~BlockInstance() = default;
 
         void Update() override;
         void Draw() override;
 
+        uint32_t GetId() { return m_Id; };
+
+        std::function<void ()> OnDelete;
+
     private:
+        uint32_t m_Id;
         ImVec2 m_DragOffset;
 };
 
@@ -116,9 +121,12 @@ class Canvas
         void Draw();
 
         void InstanceBlock(const Block &block);
+        void DeleteInstance(uint32_t id);
+        void BringToFront(uint32_t id);
 
     private:
         std::vector<BlockInstance> m_Blocks;
+        uint32_t m_NextId = 1;
 };
 
 class UI
