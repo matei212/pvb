@@ -179,7 +179,13 @@ class UI
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Instruction, "Write {str=Hello World}", "Writes to the console" },
-    BlockDefinition { BlockType::Instruction, "Add {int=1} and {int=1}", "Adds 2 numbers" },
-    BlockDefinition { BlockType::Instruction, "Round {float=0.5}", "Rounds a number" },
     BlockDefinition { BlockType::Instruction, "Clear", "Clears the console" },
+    BlockDefinition { BlockType::Expression, "{float=1} + {float=1}", "Adds 2 numbers" },
+    BlockDefinition { BlockType::Expression, "{float=1} - {float=1}", "Subtracts 2 numbers" },
+    BlockDefinition { BlockType::Expression, "{float=1} * {float=1}", "Multiplies 2 numbers" },
+    BlockDefinition { BlockType::Expression, "{float=1} / {float=1}", "Divies 2 numbers" },
+    BlockDefinition { BlockType::Expression, "{float=1} mod {int=1}", "Adds 2 numbers" },
+    BlockDefinition { BlockType::Expression, "Round {float=0.5}", "Rounds a number" },
+    BlockDefinition { BlockType::Expression, "Abs {float=0.5}", "Absolute of a number" },
+    BlockDefinition { BlockType::Expression, "Sqrt {float=0.5}", "Square root of a number" },
 };

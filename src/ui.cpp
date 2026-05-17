@@ -8,7 +8,7 @@
 
 
 // Block
-static void drawBlockShape(float x, float y, float width, float height);
+static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static BlockToken parseBlockInput(const char **ch, const char * end);
 
@@ -68,7 +68,7 @@ void Block::Draw()
     m_Pos = ImGui::GetItemRectMin();
     UpdateSize();
 
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y);
+    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type);
     drawBlockTokens(GetPosInShape(), m_Tokens);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SIDEBAR_ITEM_VSPACE);
 
@@ -102,20 +102,24 @@ void Block::UpdateSize()
                     BLOCK_HEIGHT);
 }
 
-void drawBlockShape(float x, float y, float width, float height)
+void drawBlockShape(float x, float y, float width, float height, BlockType type)
 {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->PathLineTo(ImVec2(x, y));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET, y));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH - BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH, y));
+    if (type != BlockType::Expression) {
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET, y));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH - BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH, y));
+    }
     drawList->PathLineTo(ImVec2(x + width, y));
     drawList->PathLineTo(ImVec2(x + width, y + height));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH, y + height));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH - BLOCK_NOTCH_SLOPE, y + height + BLOCK_NOTCH_HEIGHT));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_SLOPE, y + height + BLOCK_NOTCH_HEIGHT));
-    drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET, y + height));
+    if (type != BlockType::Expression) {
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH, y + height));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH - BLOCK_NOTCH_SLOPE, y + height + BLOCK_NOTCH_HEIGHT));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_SLOPE, y + height + BLOCK_NOTCH_HEIGHT));
+        drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET, y + height));
+    }
     drawList->PathLineTo(ImVec2(x, y + height));
     drawList->PathLineTo(ImVec2(x, y));
     drawList->PathFillConcave(BLOCK_COLOR);
@@ -217,7 +221,7 @@ static BlockToken parseBlockInput(const char **ch, const char * end)
 // Block Instance
 BlockInstance::BlockInstance(const Block &block, uint32_t id, bool isDragging)
     : Block(block.GetDefinition()),
-      m_Id(id)
+    m_Id(id)
 {
     m_Tokens = block.GetTokens();
     m_Pos = block.GetPos();
@@ -245,7 +249,7 @@ void BlockInstance::Update()
             m_MouseDownPos = mousePos;
         }
 
-         if (m_IsMouseDown && io.MouseDown[ImGuiMouseButton_Left]) {
+        if (m_IsMouseDown && io.MouseDown[ImGuiMouseButton_Left]) {
             float dx = mousePos.x - m_MouseDownPos.x;
             float dy = mousePos.y - m_MouseDownPos.y;
             float dist = sqrt(dx * dx + dy * dy);
@@ -256,9 +260,9 @@ void BlockInstance::Update()
                 OnStartDrag();
                 m_IsMouseDown = false;
             }
-         }
+        }
 
-         m_IsMouseDown = io.MouseDown[ImGuiMouseButton_Left];
+        m_IsMouseDown = io.MouseDown[ImGuiMouseButton_Left];
     }
 
     if (m_IsDragging) {
@@ -297,7 +301,7 @@ void BlockInstance::Draw()
     UpdateSize();
 
     ImGui::SetCursorPos(m_Pos);
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y);
+    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type);
     drawBlockTokens(GetPosInShape(), m_Tokens);
 
     // Create an invisible button covering the whole block
