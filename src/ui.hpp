@@ -60,6 +60,7 @@ class Block
         const ImVec2 &GetSize() const { return m_Size; }
 
         std::function<void ()> OnStartDrag;
+        std::function<void ()> OnEndDrag;
 
     protected:
         ImVec2 GetPosInShape();
@@ -69,7 +70,6 @@ class Block
         ImVec2 m_Pos;
         ImVec2 m_Size;
         bool m_IsDragging = false;
-        bool m_HasCreatedInstance = false;
 
         const BlockDefinition *m_Definition;
         std::vector<BlockToken> m_Tokens;
@@ -129,12 +129,16 @@ class Canvas
         void BringToFront(uint32_t id);
         void DuplicateInstance(const BlockInstance &original);
 
+        bool IsDraggingBlock() { return m_IsDraggingBlock; }
+
     private:
         void SetInstanceCallbacks(BlockInstance &instance);
 
     private:
         std::vector<BlockInstance> m_Blocks;
         uint32_t m_NextId = 1;
+
+        bool m_IsDraggingBlock = false;
 };
 
 class UI

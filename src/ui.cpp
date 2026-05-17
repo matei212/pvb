@@ -49,15 +49,11 @@ void Block::Update()
 
         if (mouseDragging && !m_IsDragging) {
             m_IsDragging = true;
-            if (!m_HasCreatedInstance) {
-                OnStartDrag();
-                m_HasCreatedInstance = true;
-            }
+            OnStartDrag();
         }
 
         if (!mouseDragging && m_IsDragging) {
             m_IsDragging = false;
-            m_HasCreatedInstance = false;
         }
     }
 }
@@ -254,6 +250,7 @@ void BlockInstance::Update()
             m_Pos.y = mousePos.y - m_DragOffset.y;
         } else {
             m_IsDragging = false;
+            OnEndDrag();
         }
     }
 }
@@ -380,8 +377,8 @@ void Canvas::InstanceBlock(const Block &block)
     m_Blocks.emplace_back(block, m_NextId++, true);
     BlockInstance &instance = m_Blocks.back();
     SetInstanceCallbacks(instance);
-
     LOG_DEBUG("created instanced with id %u", instance.GetId());
+    instance.OnStartDrag();
 }
 
 void Canvas::DuplicateInstance(const BlockInstance &original)
@@ -435,7 +432,15 @@ void Canvas::SetInstanceCallbacks(BlockInstance &instance)
     uint32_t id = m_Blocks.back().GetId();
     instance.OnDelete = [this, id] { DeleteInstance(id); };
     instance.OnDuplicate = [this, &instance] { DuplicateInstance(instance); };
-    instance.OnStartDrag = [this, id] { BringToFront(id); };
+    instance.OnStartDrag = [this, id] {
+        BringToFront(id);
+        m_IsDraggingBlock = true;
+        LOG_DEBUG("drag started for instance %u", id);
+    };
+    instance.OnEndDrag = [this, id] {
+        m_IsDraggingBlock = false;
+        LOG_DEBUG("drag ended for instance %u", id);
+    };
 }
 
 
@@ -473,6 +478,7 @@ void UI::Init()
     m_Canvas.Init();
 
     m_Sidebar.OnCreateBlock = [&](const Block &block) {
+        if (m_Canvas.IsDraggingBlock()) return;
         m_Canvas.InstanceBlock(block);
     };
 }
