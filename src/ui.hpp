@@ -69,6 +69,7 @@ class Block
         ImVec2 m_Pos;
         ImVec2 m_Size;
         bool m_IsDragging = false;
+        bool m_HasCreatedInstance = false;
 
         const BlockDefinition *m_Definition;
         std::vector<BlockToken> m_Tokens;

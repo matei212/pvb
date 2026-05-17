@@ -49,11 +49,15 @@ void Block::Update()
 
         if (mouseDragging && !m_IsDragging) {
             m_IsDragging = true;
-            OnStartDrag();
+            if (!m_HasCreatedInstance) {
+                OnStartDrag();
+                m_HasCreatedInstance = true;
+            }
         }
 
         if (!mouseDragging && m_IsDragging) {
             m_IsDragging = false;
+            m_HasCreatedInstance = false;
         }
     }
 }
