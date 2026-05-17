@@ -96,6 +96,8 @@ class BlockInstance : public Block
     private:
         uint32_t m_Id;
         ImVec2 m_DragOffset;
+
+        bool m_IsMenuOpen = false;
 };
 
 class Sidebar
@@ -127,7 +129,7 @@ class Canvas
         void InstanceBlock(const Block &block);
         void DeleteInstance(uint32_t id);
         void BringToFront(uint32_t id);
-        void DuplicateInstance(const BlockInstance &original);
+        void DuplicateInstance(uint32_t id);
 
         bool IsDraggingBlock() { return m_IsDraggingBlock; }
 

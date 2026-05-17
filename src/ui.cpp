@@ -235,6 +235,8 @@ BlockInstance::BlockInstance(const BlockInstance &instance, uint32_t id, const I
 
 void BlockInstance::Update()
 {
+    if (m_IsMenuOpen) return;
+
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mousePos = io.MousePos;
 
@@ -287,10 +289,12 @@ void BlockInstance::Draw()
     ImGui::SetCursorScreenPos(m_Pos);
     ImGui::InvisibleButton("BlockClickable", m_Size);
 
-    if (ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right)) {
+    m_IsMenuOpen = ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right);
+    if (m_IsMenuOpen) {
         if (ImGui::MenuItem("Delete")) OnDelete();
         if (ImGui::MenuItem("Duplicate")) OnDuplicate();
         ImGui::EndPopup();
+        m_IsMenuOpen = true;
     }
 
     ImGui::PopID();
@@ -381,13 +385,27 @@ void Canvas::InstanceBlock(const Block &block)
     instance.OnStartDrag();
 }
 
-void Canvas::DuplicateInstance(const BlockInstance &original)
+void Canvas::DuplicateInstance(uint32_t id)
 {
+    int32_t idx = -1;
+    for (size_t i = 0; i < m_Blocks.size(); i ++) {
+        if (id == m_Blocks[i].GetId()) {
+            idx = i;
+            break;
+        }
+    }
+
+    if (idx == -1) {
+        LOG_ERROR("failed to find block with id %u", id);
+        return;
+    }
+
+    BlockInstance &original = m_Blocks[idx];
     m_Blocks.emplace_back(original, m_NextId++, ImVec2(original.GetPos().x + 100.0, original.GetPos().y + 100.0));
     BlockInstance &instance = m_Blocks.back();
     SetInstanceCallbacks(instance);
 
-    LOG_DEBUG("duplicated instance with id %u", original.GetId());
+    LOG_DEBUG("duplicated instance with id %u", id);
 }
 
 void Canvas::DeleteInstance(uint32_t id)
@@ -431,7 +449,7 @@ void Canvas::SetInstanceCallbacks(BlockInstance &instance)
 {
     uint32_t id = m_Blocks.back().GetId();
     instance.OnDelete = [this, id] { DeleteInstance(id); };
-    instance.OnDuplicate = [this, &instance] { DuplicateInstance(instance); };
+    instance.OnDuplicate = [this, id] { DuplicateInstance(id); };
     instance.OnStartDrag = [this, id] {
         BringToFront(id);
         m_IsDraggingBlock = true;

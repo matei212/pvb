@@ -11,8 +11,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
-option(PVB_FETCH_DEPS "Download third-party GUI dependencies with FetchContent" ON)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build" FORCE)
+endif()
 
+option(PVB_FETCH_DEPS "Download third-party GUI dependencies with FetchContent" ON)
 if(PVB_FETCH_DEPS)
     FetchContent_Declare(
         glfw
@@ -77,3 +80,10 @@ else()
     target_compile_options(pvb PRIVATE -Wall -Wextra)
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(MSVC)
+        target_compile_options(pvb PRIVATE /Zi /Od)
+    else()
+        target_compile_options(pvb PRIVATE -g -O0)
+    endif()
+endif()
