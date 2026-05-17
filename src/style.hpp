@@ -1,10 +1,10 @@
 #pragma once
 
-inline constexpr float SIDEBAR_MIN_WIDTH = 200.0f;
-inline constexpr float SIDEBAR_MAX_WIDTH = 320.0f;
+inline constexpr float SIDEBAR_WIDTH = 220.0f;
 inline constexpr float SIDEBAR_PAD = 8.0f;
 inline constexpr float SIDEBAR_ITEM_VSPACE = 12.0f;
 
+inline constexpr float BLOCK_DRAG_THRESH = 5.0f;
 inline constexpr ImU32 BLOCK_COLOR = IM_COL32(49, 96, 146, 255);
 inline constexpr ImU32 BLOCK_TEXT_COLOR = IM_COL32(245, 248, 252, 255);
 inline constexpr float BLOCK_HPAD = 14.0f;

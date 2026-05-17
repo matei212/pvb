@@ -95,6 +95,9 @@ class BlockInstance : public Block
 
     private:
         uint32_t m_Id;
+
+        ImVec2 m_MouseDownPos;
+        bool m_IsMouseDown;
         ImVec2 m_DragOffset;
 
         bool m_IsMenuOpen = false;

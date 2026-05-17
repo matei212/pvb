@@ -240,10 +240,25 @@ void BlockInstance::Update()
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mousePos = io.MousePos;
 
-    if (!m_IsDragging && IsHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        m_IsDragging = true;
-        m_DragOffset = ImVec2(mousePos.x - m_Pos.x, mousePos.y - m_Pos.y);
-        OnStartDrag();
+    if (!m_IsDragging && IsHovered()) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            m_MouseDownPos = mousePos;
+        }
+
+         if (m_IsMouseDown && io.MouseDown[ImGuiMouseButton_Left]) {
+            float dx = mousePos.x - m_MouseDownPos.x;
+            float dy = mousePos.y - m_MouseDownPos.y;
+            float dist = sqrt(dx * dx + dy * dy);
+
+            if (dist >= BLOCK_DRAG_THRESH) {
+                m_IsDragging = true;
+                m_DragOffset = ImVec2(mousePos.x - m_Pos.x, mousePos.y - m_Pos.y);
+                OnStartDrag();
+                m_IsMouseDown = false;
+            }
+         }
+
+         m_IsMouseDown = io.MouseDown[ImGuiMouseButton_Left];
     }
 
     if (m_IsDragging) {
@@ -328,16 +343,12 @@ void Sidebar::Update()
 
 void Sidebar::Draw()
 {
-    ImGui::SetNextWindowSizeConstraints(
-            ImVec2(SIDEBAR_MIN_WIDTH, 0.0f),
-            ImVec2(SIDEBAR_MAX_WIDTH, FLT_MAX));
-
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SIDEBAR_PAD, SIDEBAR_PAD));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, SIDEBAR_ITEM_VSPACE));
     ImGui::BeginChild(
             "Sidebar",
-            ImVec2(SIDEBAR_MIN_WIDTH, 0.0f),
-            ImGuiChildFlags_ResizeX | ImGuiChildFlags_AlwaysUseWindowPadding);
+            ImVec2(SIDEBAR_WIDTH, 0.0f),
+            ImGuiChildFlags_AlwaysUseWindowPadding);
 
     for (auto &block : m_Blocks) {
         block.Draw();
