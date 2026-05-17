@@ -89,11 +89,6 @@ bool Block::IsHovered()
         && mousePos.y >= topLeft.y && mousePos.y <= botRight.y;
 }
 
-bool Block::IsMouseDown()
-{
-    return IsHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-}
-
 ImVec2 Block::GetPosInShape()
 {
     ImVec2 textSize = ImGui::CalcTextSize(m_Definition->nameFmt.c_str());
@@ -103,7 +98,8 @@ ImVec2 Block::GetPosInShape()
 void Block::UpdateSize()
 {
     ImVec2 textSize = ImGui::CalcTextSize(m_Definition->nameFmt.c_str());
-    m_Size = ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH), BLOCK_HEIGHT);
+    m_Size = ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
+                    BLOCK_HEIGHT);
 }
 
 void drawBlockShape(float x, float y, float width, float height)
@@ -261,6 +257,23 @@ void BlockInstance::Update()
 void BlockInstance::Draw()
 {
     assert(m_Definition != nullptr);
+
+    if (m_IsDragging) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+        ImGui::SetNextWindowBgAlpha(0.0f);
+        ImGui::SetNextWindowPos(m_Pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(m_Size.x, m_Size.y + BLOCK_NOTCH_HEIGHT));
+
+        ImGui::Begin("DraggingBlock", nullptr,
+                ImGuiWindowFlags_NoTitleBar
+                | ImGuiWindowFlags_NoResize
+                | ImGuiWindowFlags_NoScrollbar
+                | ImGuiWindowFlags_NoScrollWithMouse
+                | ImGuiWindowFlags_NoInputs
+                | ImGuiWindowFlags_NoDecoration);
+    }
+
     ImGui::PushID(m_Id);
 
     UpdateSize();
@@ -279,8 +292,12 @@ void BlockInstance::Draw()
         ImGui::EndPopup();
     }
 
-
     ImGui::PopID();
+
+    if (m_IsDragging) {
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
 }
 
 
@@ -351,6 +368,7 @@ void Canvas::Draw()
         block.Draw();
     }
     ImGui::EndChild();
+
 }
 
 void Canvas::InstanceBlock(const Block &block)

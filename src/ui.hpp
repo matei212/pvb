@@ -53,7 +53,6 @@ class Block
         virtual void Draw();
 
         bool IsHovered();
-        bool IsMouseDown();
 
         const BlockDefinition *GetDefinition() const { return m_Definition; }
         const std::vector<BlockToken> &GetTokens() const { return m_Tokens; }
