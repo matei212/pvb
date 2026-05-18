@@ -14,6 +14,7 @@
 
 enum class BlockType
 {
+    Event = 0,
     Instruction,
     Expression,
 };
@@ -178,6 +179,7 @@ class UI
 };
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {
+    BlockDefinition { BlockType::Event, "Main", "Main entry point" },
     BlockDefinition { BlockType::Instruction, "Write {str=Hello World}", "Writes to the console" },
     BlockDefinition { BlockType::Instruction, "Clear", "Clears the console" },
     BlockDefinition { BlockType::Expression, "{float=1} + {float=1}", "Adds 2 numbers" },

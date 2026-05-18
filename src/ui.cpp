@@ -106,7 +106,7 @@ void drawBlockShape(float x, float y, float width, float height, BlockType type)
 {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->PathLineTo(ImVec2(x, y));
-    if (type != BlockType::Expression) {
+    if (type != BlockType::Expression && type != BlockType::Event) {
         drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET, y));
         drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
         drawList->PathLineTo(ImVec2(x + BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH - BLOCK_NOTCH_SLOPE, y + BLOCK_NOTCH_HEIGHT));
