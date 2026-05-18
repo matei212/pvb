@@ -8,8 +8,9 @@
 
 
 // Block
-static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction);
+static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
+static ImU32 getCategoryColor(BlockCategory category);
 static BlockToken parseBlockInput(const char **ch, const char * end);
 
 Block::Block(const BlockDefinition* definition)
@@ -68,7 +69,7 @@ void Block::Draw()
     m_Pos = ImGui::GetItemRectMin();
     UpdateSize();
 
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type);
+    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type, m_Definition->category);
     drawBlockTokens(GetPosInShape(), m_Tokens);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SIDEBAR_ITEM_VSPACE);
 
@@ -102,7 +103,7 @@ void Block::UpdateSize()
                     BLOCK_HEIGHT);
 }
 
-void drawBlockShape(float x, float y, float width, float height, BlockType type)
+void drawBlockShape(float x, float y, float width, float height, BlockType type, BlockCategory category)
 {
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->PathLineTo(ImVec2(x, y));
@@ -122,7 +123,7 @@ void drawBlockShape(float x, float y, float width, float height, BlockType type)
     }
     drawList->PathLineTo(ImVec2(x, y + height));
     drawList->PathLineTo(ImVec2(x, y));
-    drawList->PathFillConcave(BLOCK_COLOR);
+    drawList->PathFillConcave(getCategoryColor(category));
 }
 
 void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
@@ -173,6 +174,23 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
                     break;
                 }
         }
+    }
+}
+
+static ImU32 getCategoryColor(BlockCategory category)
+{
+    switch (category) {
+        case BlockCategory::Event:
+            return CATEGORY_EVENT_COLOR;
+        case BlockCategory::Console:
+            return CATEGORY_CONSOLE_COLOR;
+        case BlockCategory::Math:
+            return CATEGORY_MATH_COLOR;
+        case BlockCategory::Logic:
+            return CATEGORY_LOGIC_COLOR;
+        default:
+            LOG_WARN("unknown category %d", static_cast<int>(category));
+            return BLOCK_COLOR;
     }
 }
 
@@ -301,7 +319,7 @@ void BlockInstance::Draw()
     UpdateSize();
 
     ImGui::SetCursorPos(m_Pos);
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type);
+    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type, m_Definition->category);
     drawBlockTokens(GetPosInShape(), m_Tokens);
 
     // Create an invisible button covering the whole block

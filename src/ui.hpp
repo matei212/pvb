@@ -19,11 +19,20 @@ enum class BlockType
     Expression,
 };
 
+enum class BlockCategory
+{
+    Event = 0,
+    Console,
+    Math,
+    Logic,
+};
+
 struct BlockDefinition
 {
     BlockType type;
     std::string nameFmt;
     std::string description;
+    BlockCategory category;
 };
 
 enum class BlockTokenType
@@ -181,15 +190,25 @@ class UI
 };
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {
-    BlockDefinition { BlockType::Event, "Main", "Main entry point" },
-    BlockDefinition { BlockType::Instruction, "Write {str=Hello World}", "Writes to the console" },
-    BlockDefinition { BlockType::Instruction, "Clear", "Clears the console" },
-    BlockDefinition { BlockType::Expression, "{float=1} + {float=1}", "Adds 2 numbers" },
-    BlockDefinition { BlockType::Expression, "{float=1} - {float=1}", "Subtracts 2 numbers" },
-    BlockDefinition { BlockType::Expression, "{float=1} * {float=1}", "Multiplies 2 numbers" },
-    BlockDefinition { BlockType::Expression, "{float=1} / {float=1}", "Divies 2 numbers" },
-    BlockDefinition { BlockType::Expression, "{float=1} mod {int=1}", "Adds 2 numbers" },
-    BlockDefinition { BlockType::Expression, "Round {float=0.5}", "Rounds a number" },
-    BlockDefinition { BlockType::Expression, "Abs {float=0.5}", "Absolute of a number" },
-    BlockDefinition { BlockType::Expression, "Sqrt {float=0.5}", "Square root of a number" },
+    BlockDefinition { BlockType::Event,       "Main",                       "Main entry point",                                        BlockCategory::Event   },
+    BlockDefinition { BlockType::Instruction, "Write {str=Hello World}",    "Writes to the console",                                   BlockCategory::Console },
+    BlockDefinition { BlockType::Instruction, "Clear",                      "Clears the console",                                      BlockCategory::Console },
+    BlockDefinition { BlockType::Expression,  "{float=1} + {float=1}",      "Adds 2 numbers",                                          BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "{float=1} - {float=1}",      "Subtracts 2 numbers",                                     BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "{float=1} * {float=1}",      "Multiplies 2 numbers",                                    BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "{float=1} / {float=1}",      "Divies 2 numbers",                                        BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "{int=1} mod {int=1}",        "Adds 2 numbers",                                          BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "round {float=0.5}",          "Rounds a number",                                         BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "abs {float=0.5}",            "Absolute of a number",                                    BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "sqrt {float=0.5}",           "Square root of a number",                                 BlockCategory::Math    },
+    BlockDefinition { BlockType::Expression,  "true",                       "true value",                                              BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "false",                      "false value",                                             BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0.5} < {float=0.5}",  "Checks if a number is less than another number",          BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0.5} <= {float=0.5}", "Checks if a number is less or equal than another number", BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0.5} > {float=0.5}",  "Checks if a number is greater than another number",       BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0.5} >= {float=0.5}", "Checks if a number is greater or equal and another",      BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0.5} = {float=0.5}",  "Checks if 2 numbers are equal",                           BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "not {float=0}",              "Negates a condition",                                     BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0} and {float=0}",    "Ands 2 conditions",                                       BlockCategory::Logic   },
+    BlockDefinition { BlockType::Expression,  "{float=0} or {float=0}",     "Ors 2 conditions",                                        BlockCategory::Logic   },
 };
