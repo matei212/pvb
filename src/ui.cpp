@@ -58,6 +58,8 @@ BlockData::BlockData(const BlockDefinition *def)
 
 void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
 {
+    ImGui::PushID(&data);
+
     ImVec2 size = calcBlockSize(data.definition);
     ImGui::Dummy(size);
     ImVec2 pos = ImGui::GetItemRectMin();
@@ -76,6 +78,8 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     }
 
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SIDEBAR_ITEM_VSPACE);
+
+    ImGui::PopID();
 }
 
 void drawBlockShape(float x, float y, float width, float height, BlockType type, BlockCategory category)
@@ -307,8 +311,6 @@ void Sidebar::Init()
     m_Blocks.reserve(g_BlockDefinitions.size());
     for (auto &definition : g_BlockDefinitions) {
         m_Blocks.emplace_back(&definition);
-        // Block &block = m_Blocks.back();
-        // block.OnStartDrag = [&]() { OnCreateBlock(block); };
     }
     LOG_DEBUG("initialized sidebar");
 }
@@ -331,7 +333,6 @@ void Sidebar::Draw(UIEventQueue &events)
 
     for (auto &block : m_Blocks) {
         DrawSidebarBlock(block, events);
-        // block.Draw();
     }
 
     ImGui::PopStyleVar(2);
