@@ -244,7 +244,7 @@ void BlockInstance::Update()
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 mousePos = io.MousePos;
 
-    if (!m_IsDragging && IsHovered()) {
+    if (!m_IsDragging && m_IsActive) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             m_MouseDownPos = mousePos;
         }
@@ -307,6 +307,8 @@ void BlockInstance::Draw()
     // Create an invisible button covering the whole block
     ImGui::SetCursorScreenPos(m_Pos);
     ImGui::InvisibleButton("BlockClickable", m_Size);
+    m_IsHovered = ImGui::IsItemHovered();
+    m_IsActive = ImGui::IsItemActive();
 
     m_IsMenuOpen = ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right);
     if (m_IsMenuOpen) {

@@ -102,6 +102,8 @@ class BlockInstance : public Block
         ImVec2 m_DragOffset;
 
         bool m_IsMenuOpen = false;
+        bool m_IsHovered = false;
+        bool m_IsActive = false;
 };
 
 class Sidebar
