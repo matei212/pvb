@@ -2,10 +2,10 @@
 #include <cmath>
 #include <cctype>
 #include <iostream>
+#include <algorithm>
 
 #include "ui.hpp"
 #include "log.hpp"
-
 
 // Block
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
@@ -13,94 +13,69 @@ static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static ImU32 getCategoryColor(BlockCategory category);
 static BlockToken parseBlockInput(const char **ch, const char * end);
 
-Block::Block(const BlockDefinition* definition)
-    : m_Definition(definition)
+static ImVec2 calcBlockSize(const BlockDefinition *def)
 {
-    assert(m_Definition != nullptr);
+    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
+    return ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
+                  BLOCK_HEIGHT);
+}
 
-    // Parse name
-    const std::string &str = definition->nameFmt;
+static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
+{
+    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
+    return ImVec2(pos.x + BLOCK_HPAD, pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5f);
+}
+
+
+BlockData::BlockData(const BlockDefinition *def)
+    : definition(def)
+{
+    assert(def != nullptr);
+    assert(!def->nameFmt.empty());
+
+    // TODO: Extract this into a separate function
+    const std::string &str = def->nameFmt;
     const char *ch = str.data();
     const char *end = ch + str.size();
 
     while (ch != end) {
         if (*ch == '{') {
-            m_Tokens.push_back(parseBlockInput(&ch, end));
+            tokens.push_back(parseBlockInput(&ch, end));
         } else {
-            if (m_Tokens.empty() || m_Tokens.back().type != BlockTokenType::Text) {
-                m_Tokens.emplace_back();
+            if (tokens.empty() || tokens.back().type != BlockTokenType::Text) {
+                tokens.emplace_back();
             }
 
-            BlockToken &last = m_Tokens.back();
+            BlockToken &last = tokens.back();
             last.type = BlockTokenType::Text;
             last.text += *ch;
         }
 
         ch ++;
     }
+
 }
 
-void Block::Update()
+void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
 {
-    assert(m_Definition != nullptr);
-    assert(OnStartDrag != nullptr);
+    ImVec2 size = calcBlockSize(data.definition);
+    ImGui::Dummy(size);
+    ImVec2 pos = ImGui::GetItemRectMin();
+    bool hovered = ImGui::IsItemHovered();
 
-    if (IsHovered()) {
-        bool mouseDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+    ImVec2 textOffset = blockTextOrigin(pos, data.definition);
+    drawBlockShape(pos.x, pos.y, size.x, size.y, data.definition->type, data.definition->category);
+    drawBlockTokens(textOffset, const_cast<std::vector<BlockToken>&>(data.tokens));
 
-        if (mouseDragging && !m_IsDragging) {
-            m_IsDragging = true;
-            OnStartDrag();
-        }
+    if (hovered) {
+        ImGui::SetTooltip("%s", data.definition->description.c_str());
 
-        if (!mouseDragging && m_IsDragging) {
-            m_IsDragging = false;
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+            events.Push({ UIEventType::BlockInstanciateRequested, 0, &data });
         }
     }
-}
 
-void Block::Draw()
-{
-    assert(m_Definition != nullptr);
-    ImGui::PushID(static_cast<int>(m_Definition->type));
-
-    // Reserve space in layout
-    ImGui::Dummy(m_Size);
-    m_Pos = ImGui::GetItemRectMin();
-    UpdateSize();
-
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type, m_Definition->category);
-    drawBlockTokens(GetPosInShape(), m_Tokens);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SIDEBAR_ITEM_VSPACE);
-
-    if (IsHovered()) {
-        ImGui::SetTooltip("%s", m_Definition->description.c_str());
-    }
-
-    ImGui::PopID();
-}
-
-bool Block::IsHovered()
-{
-    ImVec2 topLeft = m_Pos;
-    ImVec2 botRight = ImVec2(m_Pos.x + m_Size.x, m_Pos.y + m_Size.y);
-    ImVec2 mousePos = ImGui::GetIO().MousePos;
-
-    return mousePos.x >= topLeft.x && mousePos.x <= botRight.x
-        && mousePos.y >= topLeft.y && mousePos.y <= botRight.y;
-}
-
-ImVec2 Block::GetPosInShape()
-{
-    ImVec2 textSize = ImGui::CalcTextSize(m_Definition->nameFmt.c_str());
-    return ImVec2(m_Pos.x + BLOCK_HPAD, m_Pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5);
-}
-
-void Block::UpdateSize()
-{
-    ImVec2 textSize = ImGui::CalcTextSize(m_Definition->nameFmt.c_str());
-    m_Size = ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
-                    BLOCK_HEIGHT);
 }
 
 void drawBlockShape(float x, float y, float width, float height, BlockType type, BlockCategory category)
@@ -237,73 +212,16 @@ static BlockToken parseBlockInput(const char **ch, const char * end)
 
 
 // Block Instance
-BlockInstance::BlockInstance(const Block &block, uint32_t id, bool isDragging)
-    : Block(block.GetDefinition()),
-    m_Id(id)
+void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
 {
-    m_Tokens = block.GetTokens();
-    m_Pos = block.GetPos();
-    m_Size = block.GetSize();
-    m_IsDragging = isDragging;
-}
+    assert(block.data.definition != nullptr);
 
-BlockInstance::BlockInstance(const BlockInstance &instance, uint32_t id, const ImVec2 &pos)
-    : BlockInstance(instance)
-{
-    m_Id = id;
-    m_Pos = pos;
-    m_IsDragging = false;
-}
-
-void BlockInstance::Update()
-{
-    if (m_IsMenuOpen) return;
-
-    ImGuiIO& io = ImGui::GetIO();
-    ImVec2 mousePos = io.MousePos;
-
-    if (!m_IsDragging && m_IsActive) {
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-            m_MouseDownPos = mousePos;
-        }
-
-        if (m_IsMouseDown && io.MouseDown[ImGuiMouseButton_Left]) {
-            float dx = mousePos.x - m_MouseDownPos.x;
-            float dy = mousePos.y - m_MouseDownPos.y;
-            float dist = sqrt(dx * dx + dy * dy);
-
-            if (dist >= BLOCK_DRAG_THRESH) {
-                m_IsDragging = true;
-                m_DragOffset = ImVec2(mousePos.x - m_Pos.x, mousePos.y - m_Pos.y);
-                OnStartDrag();
-                m_IsMouseDown = false;
-            }
-        }
-
-        m_IsMouseDown = io.MouseDown[ImGuiMouseButton_Left];
-    }
-
-    if (m_IsDragging) {
-        if (io.MouseDown[ImGuiMouseButton_Left]) {
-            m_Pos.x = mousePos.x - m_DragOffset.x;
-            m_Pos.y = mousePos.y - m_DragOffset.y;
-        } else {
-            m_IsDragging = false;
-            OnEndDrag();
-        }
-    }
-}
-
-void BlockInstance::Draw()
-{
-    assert(m_Definition != nullptr);
-
-    if (m_IsDragging) {
+    if (block.isDragging) {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
         ImGui::SetNextWindowBgAlpha(0.0f);
-        ImGui::SetNextWindowPos(m_Pos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(m_Size.x, m_Size.y + BLOCK_NOTCH_HEIGHT));
+        ImGui::SetNextWindowPos(block.pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(block.size.x, block.size.y + BLOCK_NOTCH_HEIGHT));
 
         ImGui::Begin("DraggingBlock", nullptr,
                 ImGuiWindowFlags_NoTitleBar
@@ -314,33 +232,70 @@ void BlockInstance::Draw()
                 | ImGuiWindowFlags_NoDecoration);
     }
 
-    ImGui::PushID(m_Id);
+    block.size = calcBlockSize(block.data.definition);
+    ImGui::PushID(static_cast<int>(block.id));
 
-    UpdateSize();
+    ImGui::SetCursorScreenPos(block.pos);
+    ImGui::InvisibleButton("##block", block.size);
 
-    ImGui::SetCursorPos(m_Pos);
-    drawBlockShape(m_Pos.x, m_Pos.y, m_Size.x, m_Size.y, m_Definition->type, m_Definition->category);
-    drawBlockTokens(GetPosInShape(), m_Tokens);
+    // Right-click context menu.
+    block.isMenuOpen = ImGui::BeginPopupContextItem("##ctx", ImGuiMouseButton_Right);
+    if (block.isMenuOpen) {
+        if (ImGui::MenuItem("Duplicate")) events.Push({ UIEventType::BlockDuplicateReqested, block.id, nullptr });
+        if (ImGui::MenuItem("Delete")) events.Push({ UIEventType::BlockDeleteReqested, block.id, nullptr });
 
-    // Create an invisible button covering the whole block
-    ImGui::SetCursorScreenPos(m_Pos);
-    ImGui::InvisibleButton("BlockClickable", m_Size);
-    m_IsHovered = ImGui::IsItemHovered();
-    m_IsActive = ImGui::IsItemActive();
-
-    m_IsMenuOpen = ImGui::BeginPopupContextItem("Popup", ImGuiMouseButton_Right);
-    if (m_IsMenuOpen) {
-        if (ImGui::MenuItem("Delete")) OnDelete();
-        if (ImGui::MenuItem("Duplicate")) OnDuplicate();
         ImGui::EndPopup();
-        m_IsMenuOpen = true;
     }
+
+    block.isActive = ImGui::IsItemActive();
+
+    drawBlockShape(block.pos.x, block.pos.y, block.size.x, block.size.y, block.data.definition->type, block.data.definition->category);
+    drawBlockTokens(blockTextOrigin(block.pos, block.data.definition), block.data.tokens);
 
     ImGui::PopID();
 
-    if (m_IsDragging) {
+    if (block.isDragging) {
         ImGui::End();
         ImGui::PopStyleVar();
+    }
+}
+
+void UpdateCanvasBlock(BlockInstance &block, UIEventQueue &events)
+{
+    if (block.isMenuOpen) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 mousePos = io.MousePos;
+
+    if (!block.isDragging && block.isActive) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            block.mouseDownPos = mousePos;
+        }
+
+        if (block.isMouseDown && io.MouseDown[ImGuiMouseButton_Left]) {
+            float dx = mousePos.x - block.mouseDownPos.x;
+            float dy = mousePos.y - block.mouseDownPos.y;
+            float dist = sqrt(dx * dx + dy * dy);
+
+            if (dist >= BLOCK_DRAG_THRESH) {
+                block.isDragging = true;
+                block.dragOffset = ImVec2(mousePos.x - block.pos.x, mousePos.y - block.pos.y);
+                block.isMouseDown = false;
+                events.Push({ UIEventType::BlockDragStarted, block.id, nullptr });
+            }
+        }
+
+        block.isMouseDown = io.MouseDown[ImGuiMouseButton_Left];
+    }
+
+    if (block.isDragging) {
+        if (io.MouseDown[ImGuiMouseButton_Left]) {
+            block.pos.x = mousePos.x - block.dragOffset.x;
+            block.pos.y = mousePos.y - block.dragOffset.y;
+        } else {
+            block.isDragging = false;
+            events.Push({ UIEventType::BlockDragEnded, block.id, nullptr });
+        }
     }
 }
 
@@ -352,20 +307,20 @@ void Sidebar::Init()
     m_Blocks.reserve(g_BlockDefinitions.size());
     for (auto &definition : g_BlockDefinitions) {
         m_Blocks.emplace_back(&definition);
-        Block &block = m_Blocks.back();
-        block.OnStartDrag = [&]() { OnCreateBlock(block); };
+        // Block &block = m_Blocks.back();
+        // block.OnStartDrag = [&]() { OnCreateBlock(block); };
     }
     LOG_DEBUG("initialized sidebar");
 }
 
 void Sidebar::Update()
 {
-    for (auto &block : m_Blocks) {
-        block.Update();
-    }
+    // for (auto &block : m_Blocks) {
+        // block.Update();
+    // }
 }
 
-void Sidebar::Draw()
+void Sidebar::Draw(UIEventQueue &events)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SIDEBAR_PAD, SIDEBAR_PAD));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, SIDEBAR_ITEM_VSPACE));
@@ -375,7 +330,8 @@ void Sidebar::Draw()
             ImGuiChildFlags_AlwaysUseWindowPadding);
 
     for (auto &block : m_Blocks) {
-        block.Draw();
+        DrawSidebarBlock(block, events);
+        // block.Draw();
     }
 
     ImGui::PopStyleVar(2);
@@ -389,14 +345,14 @@ void Canvas::Init()
     LOG_DEBUG("Canvas Initialized");
 }
 
-void Canvas::Update()
+void Canvas::Update(UIEventQueue &events)
 {
     for (auto &block : m_Blocks) {
-        block.Update();
+        UpdateCanvasBlock(block, events);
     }
 }
 
-void Canvas::Draw()
+void Canvas::Draw(UIEventQueue &events)
 {
     ImVec2 canvasSize(
             std::max(380.0f, ImGui::GetContentRegionAvail().x),
@@ -405,54 +361,46 @@ void Canvas::Draw()
 
     ImGui::BeginChild("CanvasFrame", canvasSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     for (auto &block : m_Blocks) {
-        block.Draw();
+        DrawCanvasBlock(block, events);
     }
     ImGui::EndChild();
 
 }
 
-void Canvas::InstanceBlock(const Block &block)
+void Canvas::InstanceBlock(const BlockData &data)
 {
-    m_Blocks.emplace_back(block, m_NextId++, true);
-    BlockInstance &instance = m_Blocks.back();
-    SetInstanceCallbacks(instance);
-    LOG_DEBUG("created instanced with id %u", instance.GetId());
-    instance.OnStartDrag();
+    ImGuiIO &io = ImGui::GetIO();
+
+    ImVec2 spawnPos = io.MousePos;
+
+    BlockInstance instance {
+        .id         = m_NextId++,
+        .data       = data,
+        .pos        = spawnPos,
+        .size       = calcBlockSize(data.definition),
+        .isDragging = true,
+    };
+    m_Blocks.push_back(std::move(instance));
+    BlockInstance &inst = m_Blocks.back();
+    LOG_DEBUG("instanced block id=%u at (%.0f, %.0f)", inst.id, inst.pos.x, inst.pos.y);
 }
 
 void Canvas::DuplicateInstance(uint32_t id)
 {
-    int32_t idx = -1;
-    for (size_t i = 0; i < m_Blocks.size(); i ++) {
-        if (id == m_Blocks[i].GetId()) {
-            idx = i;
-            break;
-        }
-    }
-
-    if (idx == -1) {
-        LOG_ERROR("failed to find block with id %u", id);
-        return;
-    }
-
-    BlockInstance &original = m_Blocks[idx];
-    m_Blocks.emplace_back(original, m_NextId++, ImVec2(original.GetPos().x + 100.0, original.GetPos().y + 100.0));
-    BlockInstance &instance = m_Blocks.back();
-    SetInstanceCallbacks(instance);
-
-    LOG_DEBUG("duplicated instance with id %u", id);
+    auto original = FindBlockById(id);
+    BlockInstance inst {
+        .id         = m_NextId++,
+        .data       = original->data,
+        .pos        = ImVec2(original->pos.x + 40.0, original->pos.y + 40.0),
+        .size       = calcBlockSize(original->data.definition),
+    };
+    m_Blocks.push_back(std::move(inst));
+    LOG_DEBUG("duplicated instance id=%u at (%.0f, %.0f) with id=%u", id, inst.pos.x, inst.pos.y, inst.id);
 }
 
 void Canvas::DeleteInstance(uint32_t id)
 {
-    int32_t idx = -1;
-    for (size_t i = 0; i < m_Blocks.size(); i ++) {
-        if (id == m_Blocks[i].GetId()) {
-            idx = i;
-            break;
-        }
-    }
-
+    int32_t idx = FindIdxById(id);
     if (idx == -1) {
         LOG_ERROR("failed to find block with id %u", id);
         return;
@@ -464,14 +412,7 @@ void Canvas::DeleteInstance(uint32_t id)
 
 void Canvas::BringToFront(uint32_t id)
 {
-    int32_t idx = -1;
-    for (size_t i = 0; i < m_Blocks.size(); i ++) {
-        if (id == m_Blocks[i].GetId()) {
-            idx = i;
-            break;
-        }
-    }
-
+    int32_t idx = FindIdxById(id);
     if (idx == -1) {
         LOG_ERROR("failed to find block with id %u", id);
         return;
@@ -480,22 +421,29 @@ void Canvas::BringToFront(uint32_t id)
     std::swap(m_Blocks[idx], m_Blocks.back());
 }
 
-void Canvas::SetInstanceCallbacks(BlockInstance &instance)
+std::vector<BlockInstance>::iterator Canvas::FindBlockById(uint32_t id)
 {
-    uint32_t id = m_Blocks.back().GetId();
-    instance.OnDelete = [this, id] { DeleteInstance(id); };
-    instance.OnDuplicate = [this, id] { DuplicateInstance(id); };
-    instance.OnStartDrag = [this, id] {
-        BringToFront(id);
-        m_IsDraggingBlock = true;
-        LOG_DEBUG("drag started for instance %u", id);
-    };
-    instance.OnEndDrag = [this, id] {
-        m_IsDraggingBlock = false;
-        LOG_DEBUG("drag ended for instance %u", id);
-    };
+    return std::find_if(
+            m_Blocks.begin(),
+            m_Blocks.end(),
+            [id](const BlockInstance& b) {
+            return b.id == id;
+            }
+            );
 }
 
+int32_t Canvas::FindIdxById(uint32_t id)
+{
+    int32_t idx = -1;
+    for (size_t i = 0; i < m_Blocks.size(); i ++) {
+        if (id == m_Blocks[i].id) {
+            idx = i;
+            break;
+        }
+    }
+
+    return idx;
+}
 
 // UI
 void UI::Init()
@@ -529,19 +477,45 @@ void UI::Init()
 
     m_Sidebar.Init();
     m_Canvas.Init();
-
-    m_Sidebar.OnCreateBlock = [&](const Block &block) {
-        if (m_Canvas.IsDraggingBlock()) return;
-        m_Canvas.InstanceBlock(block);
-    };
 }
 
 void UI::Update()
 {
-    if (m_ShowSidebar) {
-        m_Sidebar.Update();
+    if (m_ShowSidebar) m_Sidebar.Update();
+    m_Canvas.Update(m_EventQueue);
+
+    for (const UIEvent &e : m_EventQueue.Drain()) {
+        switch (e.type) {
+            case UIEventType::BlockDragStarted:
+                LOG_DEBUG("drag started for block");
+                m_Canvas.IsDraggingBlock = true;
+                m_Canvas.BringToFront(e.id);
+                break;
+            case UIEventType::BlockDragEnded:
+                LOG_DEBUG("drag ended for block");
+                m_Canvas.IsDraggingBlock = false;
+                break;
+            case UIEventType::BlockInstanciateRequested:
+                LOG_DEBUG("block instanciation requested");
+                if (!m_Canvas.IsDraggingBlock) {
+                    m_Canvas.IsDraggingBlock = true;
+                    m_Canvas.InstanceBlock(*e.data);
+                }
+                break;
+            case UIEventType::BlockDeleteReqested:
+                LOG_DEBUG("block deletion requested");
+                m_Canvas.DeleteInstance(e.id);
+                break;
+            case UIEventType::BlockDuplicateReqested:
+                LOG_DEBUG("block duplication requested");
+                m_Canvas.DuplicateInstance(e.id);
+                break;
+            default:
+                LOG_WARN("unknown event type %d", static_cast<int>(e.type));
+                break;
+        }
     }
-    m_Canvas.Update();
+    m_EventQueue.Clear();
 }
 
 void UI::Draw()
@@ -640,9 +614,9 @@ void UI::DrawWorkspace()
     ImGui::BeginChild("Workspace", ImVec2(0.0f, workspaceHeight), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
-    if (m_ShowSidebar) m_Sidebar.Draw();
+    if (m_ShowSidebar) m_Sidebar.Draw(m_EventQueue);
     ImGui::SameLine();
-    m_Canvas.Draw();
+    m_Canvas.Draw(m_EventQueue);
 
     ImGui::PopStyleVar();
     ImGui::EndChild();

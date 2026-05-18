@@ -53,67 +53,64 @@ struct BlockToken
     float floatValue;
 };
 
-class Block
+struct BlockData
 {
-    public:
-        Block(const BlockDefinition* definition);
-        ~Block() = default;
+    const BlockDefinition *definition;
+    std::vector<BlockToken> tokens;
 
-        virtual void Update();
-        virtual void Draw();
-
-        bool IsHovered();
-
-        const BlockDefinition *GetDefinition() const { return m_Definition; }
-        const std::vector<BlockToken> &GetTokens() const { return m_Tokens; }
-        const ImVec2 &GetPos() const { return m_Pos; }
-        const ImVec2 &GetSize() const { return m_Size; }
-
-        std::function<void ()> OnStartDrag;
-        std::function<void ()> OnEndDrag;
-
-    protected:
-        ImVec2 GetPosInShape();
-        void UpdateSize();
-
-    protected:
-        ImVec2 m_Pos;
-        ImVec2 m_Size;
-        bool m_IsDragging = false;
-
-        const BlockDefinition *m_Definition;
-        std::vector<BlockToken> m_Tokens;
+    explicit BlockData(const BlockDefinition *def);
 };
 
-class BlockInstance : public Block
+enum class UIEventType
+{
+    BlockDragStarted,
+    BlockDragEnded,
+    BlockInstanciateRequested,
+    BlockDeleteReqested,
+    BlockDuplicateReqested,
+};
+
+struct UIEvent
+{
+    UIEventType type;
+
+    // data
+    uint32_t id;
+    const BlockData *data;
+};
+
+class UIEventQueue
 {
     public:
-        BlockInstance(const BlockInstance &instance) = default;
-        ~BlockInstance() = default;
+        void Push(UIEvent event) { m_Events.push_back(event); }
+        void Clear() { m_Events.clear(); }
 
-        BlockInstance(const BlockDefinition *definition) : Block(definition) {}
-        BlockInstance(const Block &block, uint32_t id, bool isDragging = false);
-        BlockInstance(const BlockInstance &instance, uint32_t id, const ImVec2 &pos);
-
-        void Update() override;
-        void Draw() override;
-
-        uint32_t GetId() const { return m_Id; };
-
-        std::function<void ()> OnDelete;
-        std::function<void ()> OnDuplicate;
+        const std::vector<UIEvent> &Drain() { return m_Events; }
 
     private:
-        uint32_t m_Id;
-
-        ImVec2 m_MouseDownPos;
-        bool m_IsMouseDown;
-        ImVec2 m_DragOffset;
-
-        bool m_IsMenuOpen = false;
-        bool m_IsHovered = false;
-        bool m_IsActive = false;
+        std::vector<UIEvent> m_Events;
 };
+
+void DrawSidebarBlock(const BlockData &data, UIEventQueue &events);
+
+struct BlockInstance
+{
+    uint32_t id;
+    BlockData data;
+    ImVec2 pos;
+    ImVec2 size;
+
+    // Input state
+    bool isDragging = false;
+    bool isMouseDown = false;
+    bool isMenuOpen = false;
+    bool isActive = false;
+    ImVec2 mouseDownPos = ImVec2(0.0f, 0.0f);
+    ImVec2 dragOffset = ImVec2(0.0f, 0.0f);
+};
+
+void DrawCanvasBlock(BlockInstance &Block, UIEventQueue &events);
+void UpdateCanvasBlock(BlockInstance &block, UIEventQueue &events);
 
 class Sidebar
 {
@@ -123,12 +120,10 @@ class Sidebar
 
         void Init();
         void Update();
-        void Draw();
-
-        std::function<void(const Block &block)> OnCreateBlock;
+        void Draw(UIEventQueue &events);
 
     private:
-        std::vector<Block> m_Blocks;
+        std::vector <BlockData> m_Blocks;
 };
 
 class Canvas
@@ -138,24 +133,22 @@ class Canvas
         ~Canvas() = default;
 
         void Init();
-        void Update();
-        void Draw();
+        void Update(UIEventQueue &events);
+        void Draw(UIEventQueue &events);
 
-        void InstanceBlock(const Block &block);
+        void InstanceBlock(const BlockData &block);
         void DeleteInstance(uint32_t id);
         void BringToFront(uint32_t id);
         void DuplicateInstance(uint32_t id);
 
-        bool IsDraggingBlock() { return m_IsDraggingBlock; }
+        std::vector<BlockInstance>::iterator FindBlockById(uint32_t id);
+        int32_t FindIdxById(uint32_t id);
 
-    private:
-        void SetInstanceCallbacks(BlockInstance &instance);
+        bool IsDraggingBlock = false;
 
     private:
         std::vector<BlockInstance> m_Blocks;
         uint32_t m_NextId = 1;
-
-        bool m_IsDraggingBlock = false;
 };
 
 class UI
@@ -181,6 +174,8 @@ class UI
 
     private:
         GLFWwindow *m_Window = nullptr;
+
+        UIEventQueue m_EventQueue;
 
         Sidebar m_Sidebar;
         Canvas m_Canvas;
