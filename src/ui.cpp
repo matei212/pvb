@@ -577,7 +577,13 @@ void UI::Update()
                 {
                     LOG_DEBUG("drag started for block %u", e.id);
                     m_Canvas.IsDraggingBlock = true;
-                    m_Canvas.BringToFront(e.id);
+
+                    m_Canvas.WalkBlockSequence(
+                            e.id,
+                            [this](BlockInstance &inst) {
+                                m_Canvas.BringToFront(inst.id);
+                            }
+                        );
 
                     auto inst = m_Canvas.FindBlockById(e.id);
                     if (inst->prevId != 0) {
