@@ -9,12 +9,14 @@
 #include "log.hpp"
 
 // Block
-static ImVec2 calcBlockSize(const BlockDefinition *def);
+static ImVec2 calcBlockSize(const BlockData &data);
 static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static ImU32 getCategoryColor(BlockCategory category);
 static BlockToken parseBlockInput(const char **ch, const char * end);
+static float calcTokenWidth(const BlockToken &tok);
+static float calcInputWidth(const char *text, float minW, float maxW);
 
 
 BlockData::BlockData(const BlockDefinition *def)
@@ -50,7 +52,7 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
 {
     ImGui::PushID(&data);
 
-    ImVec2 size = calcBlockSize(data.definition);
+    ImVec2 size = calcBlockSize(data);
     ImGui::Dummy(size);
     ImVec2 pos = ImGui::GetItemRectMin();
     bool hovered = ImGui::IsItemHovered();
@@ -72,11 +74,21 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     ImGui::PopID();
 }
 
-ImVec2 calcBlockSize(const BlockDefinition *def)
+ImVec2 calcBlockSize(const BlockData &data)
 {
-    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
-    return ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
-                  BLOCK_HEIGHT);
+    float width = BLOCK_HPAD * 2.0f;
+
+    for (size_t i = 0; i < data.tokens.size(); i++) {
+        width += calcTokenWidth(data.tokens[i]);
+
+        if (i + 1 < data.tokens.size()) {
+            width += BLOCK_HSPACE;
+        }
+    }
+
+    width = std::max(width, BLOCK_MIN_WIDTH);
+
+    return ImVec2(width, BLOCK_HEIGHT);
 }
 
 ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
@@ -125,34 +137,67 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
 
             case BlockTokenType::StringInput:
                 {
-                    ImGui::SetNextItemWidth(BLOCK_STR_INPUT_MAXW);
+                    float width = calcInputWidth(
+                            tok.strValue.c_str(),
+                            BLOCK_STR_INPUT_MINW,
+                            BLOCK_STR_INPUT_MAXW);
+
+                    ImGui::SetNextItemWidth(width);
                     ImGui::PushID(i);
                     ImGui::InputText("##s", &tok.strValue);
                     ImGui::PopID();
 
-                    cursorPos.x += BLOCK_STR_INPUT_MAXW + BLOCK_HSPACE;
+                    cursorPos.x += width + BLOCK_HSPACE;
                     break;
                 }
 
             case BlockTokenType::IntInput:
                 {
-                    ImGui::SetNextItemWidth(BLOCK_INT_INPUT_MAXW);
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%d", tok.intValue);
+
+                    float width = calcInputWidth(
+                            buf,
+                            BLOCK_INT_INPUT_MINW,
+                            BLOCK_INT_INPUT_MAXW);
+
+                    ImGui::SetNextItemWidth(width);
+
                     ImGui::PushID(i);
-                    ImGui::InputInt(("##i" + std::to_string(i)).c_str(), &tok.intValue, 0);
+                    ImGui::InputScalar(
+                            "##i",
+                            ImGuiDataType_S32,
+                            &tok.intValue,
+                            nullptr,
+                            nullptr);
                     ImGui::PopID();
 
-                    cursorPos.x += BLOCK_INT_INPUT_MAXW + BLOCK_HSPACE;
+                    cursorPos.x += width + BLOCK_HSPACE;
                     break;
                 }
 
             case BlockTokenType::FloatInput:
                 {
-                    ImGui::SetNextItemWidth(BLOCK_FLOAT_INPUT_MAXW);
+                    char buf[64];
+                    snprintf(buf, sizeof(buf), "%g", tok.floatValue);
+
+                    float width = calcInputWidth(
+                            buf,
+                            BLOCK_FLOAT_INPUT_MINW,
+                            BLOCK_FLOAT_INPUT_MAXW);
+
+                    ImGui::SetNextItemWidth(width);
                     ImGui::PushID(i);
-                    ImGui::InputFloat(("##f" + std::to_string(i)).c_str(), &tok.floatValue);
+                    ImGui::InputScalar(
+                            "##f",
+                            ImGuiDataType_Float,
+                            &tok.floatValue,
+                            nullptr,
+                            nullptr,
+                            "%g");
                     ImGui::PopID();
 
-                    cursorPos.x += BLOCK_FLOAT_INPUT_MAXW + BLOCK_HSPACE;
+                    cursorPos.x += width + BLOCK_HSPACE;
                     break;
                 }
         }
@@ -217,6 +262,61 @@ static BlockToken parseBlockInput(const char **ch, const char * end)
     return token;
 }
 
+static float calcTokenWidth(const BlockToken &tok)
+{
+    switch (tok.type) {
+        case BlockTokenType::Text:
+            {
+                return ImGui::CalcTextSize(tok.text.c_str()).x;
+            }
+
+        case BlockTokenType::StringInput:
+            {
+                return calcInputWidth(
+                        tok.strValue.c_str(),
+                        BLOCK_STR_INPUT_MINW,
+                        BLOCK_STR_INPUT_MAXW);
+            }
+
+        case BlockTokenType::IntInput:
+            {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%d", tok.intValue);
+
+                return calcInputWidth(
+                        buf,
+                        BLOCK_INT_INPUT_MINW,
+                        BLOCK_INT_INPUT_MAXW);
+            }
+
+        case BlockTokenType::FloatInput:
+            {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%g", tok.floatValue);
+
+                return calcInputWidth(
+                        buf,
+                        BLOCK_FLOAT_INPUT_MINW,
+                        BLOCK_FLOAT_INPUT_MAXW);
+            }
+    }
+
+    return 0.0f;
+}
+
+static float calcInputWidth(const char *text, float minW, float maxW)
+{
+    ImGuiStyle &style = ImGui::GetStyle();
+
+    float textW = ImGui::CalcTextSize(text).x;
+
+    float width =
+        textW +
+        style.FramePadding.x * 2.0f +
+        8.0f; // breathing room
+
+    return std::clamp(width, minW, maxW);
+}
 
 // Block Instance
 void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
@@ -243,7 +343,7 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
     ImGui::PushID(static_cast<int>(block.id));
 
     ImVec2 screenPos = canvas.WorldToScreen(block.pos);
-    block.size = calcBlockSize(block.data.definition);
+    block.size = calcBlockSize(block.data);
     drawBlockShape(
             screenPos.x,
             screenPos.y,
@@ -255,7 +355,7 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
     drawBlockTokens(
             blockTextOrigin(screenPos, block.data.definition),
             block.data.tokens
-    );
+            );
 
     ImGui::SetCursorScreenPos(screenPos);
     ImGui::InvisibleButton("##block", block.size);
@@ -334,7 +434,7 @@ void Sidebar::Init()
 void Sidebar::Update()
 {
     // for (auto &block : m_Blocks) {
-        // block.Update();
+    // block.Update();
     // }
 }
 
@@ -438,10 +538,10 @@ void Canvas::InstanceBlock(const BlockData &data)
 
     BlockInstance instance {
         .id         = m_NextId++,
-        .data       = data,
-        .pos        = spawnPos,
-        .size       = calcBlockSize(data.definition),
-        .isDragging = true,
+            .data       = data,
+            .pos        = spawnPos,
+            .size       = calcBlockSize(data),
+            .isDragging = true,
     };
     m_Blocks.push_back(std::move(instance));
     BlockInstance &inst = m_Blocks.back();
@@ -453,9 +553,9 @@ void Canvas::DuplicateInstance(uint32_t id)
     auto original = FindBlockById(id);
     BlockInstance inst {
         .id         = m_NextId++,
-        .data       = original->data,
-        .pos        = ImVec2(original->pos.x + 40.0, original->pos.y + 40.0),
-        .size       = calcBlockSize(original->data.definition),
+            .data       = original->data,
+            .pos        = ImVec2(original->pos.x + 40.0, original->pos.y + 40.0),
+            .size       = calcBlockSize(original->data),
     };
     m_Blocks.push_back(std::move(inst));
     LOG_DEBUG("duplicated instance id=%u at (%.0f, %.0f) with id=%u", id, inst.pos.x, inst.pos.y, inst.id);
@@ -490,8 +590,8 @@ void Canvas::AttachInstance(uint32_t id, AttachTarget target)
     }
     ImVec2 delta = ImVec2(newPos.x - instance->pos.x, newPos.y - instance->pos.y);
     WalkBlockSequence(id, [&delta](BlockInstance &inst) {
-                inst.pos.x += delta.x;
-                inst.pos.y += delta.y;
+            inst.pos.x += delta.x;
+            inst.pos.y += delta.y;
             });
 
     if (target.type == AttachType::BottomNotch) {
@@ -744,7 +844,7 @@ void UI::Update()
                     m_Canvas.WalkBlockSequence(
                             inst->id,
                             [this, &ids](BlockInstance &inst) {
-                                ids.push_back(inst.id);
+                            ids.push_back(inst.id);
                             });
 
                     for (uint32_t id : ids) {

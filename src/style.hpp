@@ -15,9 +15,13 @@ inline constexpr float BLOCK_NOTCH_SLOPE = 6.0f;
 inline constexpr float BLOCK_MIN_WIDTH = BLOCK_NOTCH_OFFSET + BLOCK_NOTCH_WIDTH + 2 * BLOCK_HPAD;
 inline constexpr float BLOCK_HEIGHT = 35.0f;
 inline constexpr float BLOCK_INPUT_HEIGHT = BLOCK_HEIGHT - 7.0f;
-inline constexpr float BLOCK_STR_INPUT_MAXW = 120.0f;
-inline constexpr float BLOCK_INT_INPUT_MAXW = 40.0f;
-inline constexpr float BLOCK_FLOAT_INPUT_MAXW = 60.0f;
+
+inline constexpr float BLOCK_STR_INPUT_MINW   = 50.0f;
+inline constexpr float BLOCK_STR_INPUT_MAXW   = 120.0f;
+inline constexpr float BLOCK_INT_INPUT_MINW   = 20.0f;
+inline constexpr float BLOCK_INT_INPUT_MAXW   = 50.0f;
+inline constexpr float BLOCK_FLOAT_INPUT_MINW = 30.0f;
+inline constexpr float BLOCK_FLOAT_INPUT_MAXW = 70.0f;
 
 inline constexpr float BLOCK_DRAG_THRESH = 5.0f;
 inline constexpr float BLOCK_SNAP_RADIUS = 15.0f;
