@@ -134,10 +134,18 @@ class Sidebar
         std::vector <BlockData> m_Blocks;
 };
 
+enum class AttachType
+{
+    BottomNotch,
+    TopNotch,
+};
+
 struct AttachTarget
 {
     uint32_t id;
     ImVec2 pos;
+    ImVec2 size;
+    AttachType type = AttachType::BottomNotch;
 };
 
 class Canvas

@@ -430,19 +430,27 @@ void Canvas::DeleteInstance(uint32_t id)
 void Canvas::AttachInstance(uint32_t id, AttachTarget target)
 {
     auto instance = FindBlockById(id);
-    auto prev = FindBlockById(target.id);
-
-    prev->nextId = id;
-    instance->prevId = prev->id;
+    auto other = FindBlockById(target.id);
 
     ImVec2 newPos = ImVec2(target.pos.x - BLOCK_NOTCH_OFFSET, target.pos.y);
+    if (target.type == AttachType::TopNotch)  {
+        newPos.y -= target.size.y;
+    }
     ImVec2 delta = ImVec2(newPos.x - instance->pos.x, newPos.y - instance->pos.y);
-
     WalkBlockSequence(id, [&delta](BlockInstance &inst) {
                 inst.pos.x += delta.x;
                 inst.pos.y += delta.y;
             });
-    LOG_DEBUG("attached block id=%u to block id=%u", id, prev->id);
+
+    if (target.type == AttachType::BottomNotch) {
+        other->nextId = id;
+        instance->prevId = other->id;
+    } else if (target.type == AttachType::TopNotch) {
+        other->prevId = id;
+        instance->nextId = other->id;
+    }
+
+    LOG_DEBUG("attached block id=%u to block id=%u", id, other->id);
 }
 
 void Canvas::DetachInstane(uint32_t id)
@@ -489,19 +497,34 @@ std::optional<AttachTarget> Canvas::FindAttachTarget(const BlockInstance &instan
     if (instance.data.definition->type == BlockType::Expression) return std::nullopt;
 
     ImVec2 topNotch = ImVec2(instance.pos.x + BLOCK_NOTCH_OFFSET, instance.pos.y);
+    ImVec2 bottomNotch = ImVec2(instance.pos.x + BLOCK_NOTCH_OFFSET, instance.pos.y + instance.size.y);
 
-    for (auto &inst : m_Blocks) {
-        if (inst.id == instance.id) continue;
-        if (inst.nextId != 0) continue;
-        if (inst.data.definition->type == BlockType::Expression) continue;
+    for (auto &target : m_Blocks) {
+        if (target.id == instance.id) continue;
+        if (target.data.definition->type == BlockType::Expression) continue;
 
-        ImVec2 bottomNotch = ImVec2(inst.pos.x + BLOCK_NOTCH_OFFSET, inst.pos.y + inst.size.y);
-        float dx = topNotch.x - bottomNotch.x;
-        float dy = topNotch.y - bottomNotch.y;
-        float dist = sqrt(dx * dx + dy * dy);
+        float dx, dy, dist;
 
-        if (dist <= BLOCK_SNAP_RADIUS) {
-            return AttachTarget { inst.id, bottomNotch };
+        // top notch of instance and bottom notch of target
+        if (target.nextId == 0) {
+            ImVec2 targetBottomNotch = ImVec2(target.pos.x + BLOCK_NOTCH_OFFSET, target.pos.y + target.size.y);
+            dx = topNotch.x - targetBottomNotch.x;
+            dy = topNotch.y - targetBottomNotch.y;
+            dist = sqrt(dx * dx + dy * dy);
+            if (dist <= BLOCK_SNAP_RADIUS) {
+                return AttachTarget { target.id, targetBottomNotch, target.size, AttachType::BottomNotch };
+            }
+        }
+
+        // bottom notch of instance and top notch of target
+        if (target.prevId == 0) {
+            ImVec2 targetTopNotch = ImVec2(target.pos.x + BLOCK_NOTCH_OFFSET, target.pos.y);
+            dx = bottomNotch.x - targetTopNotch.x;
+            dy = bottomNotch.y - targetTopNotch.y;
+            dist = sqrt(dx * dx + dy * dy);
+            if (dist <= BLOCK_SNAP_RADIUS) {
+                return AttachTarget { target.id, targetTopNotch, target.size, AttachType::TopNotch };
+            }
         }
     }
 
@@ -581,9 +604,9 @@ void UI::Update()
                     m_Canvas.WalkBlockSequence(
                             e.id,
                             [this](BlockInstance &inst) {
-                                m_Canvas.BringToFront(inst.id);
+                            m_Canvas.BringToFront(inst.id);
                             }
-                        );
+                            );
 
                     auto inst = m_Canvas.FindBlockById(e.id);
                     if (inst->prevId != 0) {
