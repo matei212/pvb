@@ -8,23 +8,12 @@
 #include "log.hpp"
 
 // Block
+static ImVec2 calcBlockSize(const BlockDefinition *def);
+static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static ImU32 getCategoryColor(BlockCategory category);
 static BlockToken parseBlockInput(const char **ch, const char * end);
-
-static ImVec2 calcBlockSize(const BlockDefinition *def)
-{
-    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
-    return ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
-                  BLOCK_HEIGHT);
-}
-
-static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
-{
-    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
-    return ImVec2(pos.x + BLOCK_HPAD, pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5f);
-}
 
 
 BlockData::BlockData(const BlockDefinition *def)
@@ -80,6 +69,19 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + SIDEBAR_ITEM_VSPACE);
 
     ImGui::PopID();
+}
+
+ImVec2 calcBlockSize(const BlockDefinition *def)
+{
+    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
+    return ImVec2(std::max(textSize.x + BLOCK_HPAD * 2.0f, BLOCK_MIN_WIDTH),
+                  BLOCK_HEIGHT);
+}
+
+ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
+{
+    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
+    return ImVec2(pos.x + BLOCK_HPAD, pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5f);
 }
 
 void drawBlockShape(float x, float y, float width, float height, BlockType type, BlockCategory category)
@@ -236,13 +238,16 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
                 | ImGuiWindowFlags_NoDecoration);
     }
 
-    block.size = calcBlockSize(block.data.definition);
     ImGui::PushID(static_cast<int>(block.id));
+
+    block.size = calcBlockSize(block.data.definition);
+    drawBlockShape(block.pos.x, block.pos.y, block.size.x, block.size.y, block.data.definition->type, block.data.definition->category);
+    drawBlockTokens(blockTextOrigin(block.pos, block.data.definition), block.data.tokens);
 
     ImGui::SetCursorScreenPos(block.pos);
     ImGui::InvisibleButton("##block", block.size);
+    block.isActive = ImGui::IsItemActive();
 
-    // Right-click context menu.
     block.isMenuOpen = ImGui::BeginPopupContextItem("##ctx", ImGuiMouseButton_Right);
     if (block.isMenuOpen) {
         if (ImGui::MenuItem("Duplicate")) events.Push({ UIEventType::BlockDuplicateReqested, block.id, nullptr });
@@ -250,11 +255,6 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
 
         ImGui::EndPopup();
     }
-
-    block.isActive = ImGui::IsItemActive();
-
-    drawBlockShape(block.pos.x, block.pos.y, block.size.x, block.size.y, block.data.definition->type, block.data.definition->category);
-    drawBlockTokens(blockTextOrigin(block.pos, block.data.definition), block.data.tokens);
 
     ImGui::PopID();
 
