@@ -230,7 +230,8 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
         ImGui::SetNextWindowPos(canvas.WorldToScreen(block.pos), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(block.size.x, block.size.y + BLOCK_NOTCH_HEIGHT));
 
-        ImGui::Begin("DraggingBlock", nullptr,
+        std::string name = "DraggingBlock" + std::to_string(block.id);
+        ImGui::Begin(name.c_str(), nullptr,
                 ImGuiWindowFlags_NoTitleBar
                 | ImGuiWindowFlags_NoResize
                 | ImGuiWindowFlags_NoScrollbar
@@ -738,11 +739,17 @@ void UI::Update()
                 {
                     LOG_DEBUG("block deletion requested");
 
+                    std::vector<uint32_t> ids;
                     auto inst = m_Canvas.FindBlockById(e.id);
                     m_Canvas.WalkBlockSequence(
                             inst->id,
-                            [this](BlockInstance &inst) { m_Canvas.DeleteInstance(inst.id); }
-                            );
+                            [this, &ids](BlockInstance &inst) {
+                                ids.push_back(inst.id);
+                            });
+
+                    for (uint32_t id : ids) {
+                        m_Canvas.DeleteInstance(id);
+                    }
 
                     break;
                 }
