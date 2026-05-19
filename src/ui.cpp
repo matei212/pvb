@@ -295,8 +295,10 @@ void UpdateCanvasBlock(BlockInstance &block, UIEventQueue &events)
 
     if (block.isDragging) {
         if (io.MouseDown[ImGuiMouseButton_Left]) {
-            block.pos.x = mousePos.x - block.dragOffset.x;
-            block.pos.y = mousePos.y - block.dragOffset.y;
+            ImVec2 oldPos = block.pos;
+            ImVec2 newPos = ImVec2(mousePos.x - block.dragOffset.x, mousePos.y - block.dragOffset.y);
+            ImVec2 delta = ImVec2(newPos.x - oldPos.x, newPos.y - oldPos.y);
+            events.Push({ .type = UIEventType::BlockDragged, .id = block.id, .delta = delta });
         } else {
             block.isDragging = false;
             events.Push({ UIEventType::BlockDragEnded, block.id, nullptr });
@@ -574,6 +576,14 @@ void UI::Update()
                         m_Canvas.DetachInstane(e.id);
                     }
 
+                    break;
+                }
+            case UIEventType::BlockDragged:
+                {
+                    m_Canvas.WalkBlockSequence(
+                            e.id,
+                            [this, &e](BlockInstance &inst) { inst.pos.x += e.delta.x; inst.pos.y += e.delta.y; }
+                            );
                     break;
                 }
             case UIEventType::BlockDragEnded:

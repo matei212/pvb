@@ -65,6 +65,7 @@ struct BlockData
 enum class UIEventType
 {
     BlockDragStarted,
+    BlockDragged,
     BlockDragEnded,
     BlockInstanciateRequested,
     BlockDeleteReqested,
@@ -76,8 +77,9 @@ struct UIEvent
     UIEventType type;
 
     // data
-    uint32_t id;
-    const BlockData *data;
+    uint32_t id = 0;
+    const BlockData *data = nullptr;
+    ImVec2 delta = ImVec2(0, 0);
 };
 
 class UIEventQueue
