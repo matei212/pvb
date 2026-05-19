@@ -219,7 +219,7 @@ static BlockToken parseBlockInput(const char **ch, const char * end)
 
 
 // Block Instance
-void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
+void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
 {
     assert(block.data.definition != nullptr);
 
@@ -227,7 +227,7 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
         ImGui::SetNextWindowBgAlpha(0.0f);
-        ImGui::SetNextWindowPos(block.pos, ImGuiCond_Always);
+        ImGui::SetNextWindowPos(canvas.WorldToScreen(block.pos), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(block.size.x, block.size.y + BLOCK_NOTCH_HEIGHT));
 
         ImGui::Begin("DraggingBlock", nullptr,
@@ -241,11 +241,22 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
 
     ImGui::PushID(static_cast<int>(block.id));
 
+    ImVec2 screenPos = canvas.WorldToScreen(block.pos);
     block.size = calcBlockSize(block.data.definition);
-    drawBlockShape(block.pos.x, block.pos.y, block.size.x, block.size.y, block.data.definition->type, block.data.definition->category);
-    drawBlockTokens(blockTextOrigin(block.pos, block.data.definition), block.data.tokens);
+    drawBlockShape(
+            screenPos.x,
+            screenPos.y,
+            block.size.x,
+            block.size.y,
+            block.data.definition->type,
+            block.data.definition->category);
 
-    ImGui::SetCursorScreenPos(block.pos);
+    drawBlockTokens(
+            blockTextOrigin(screenPos, block.data.definition),
+            block.data.tokens
+    );
+
+    ImGui::SetCursorScreenPos(screenPos);
     ImGui::InvisibleButton("##block", block.size);
     block.isActive = ImGui::IsItemActive();
     block.isHovered = ImGui::IsItemHovered();
@@ -266,12 +277,12 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
     }
 }
 
-void UpdateCanvasBlock(BlockInstance &block, UIEventQueue &events)
+void UpdateCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
 {
     if (block.isMenuOpen) return;
 
     ImGuiIO& io = ImGui::GetIO();
-    ImVec2 mousePos = io.MousePos;
+    ImVec2 mousePos = canvas.ScreenToWorld(io.MousePos);
 
     if (!block.isDragging && block.isActive) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -352,8 +363,25 @@ void Canvas::Init()
 
 void Canvas::Update(UIEventQueue &events)
 {
+    ImGuiIO &io = ImGui::GetIO();
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+        m_IsPanning = true;
+        m_LastMousePos = io.MousePos;
+    }
+
+    if (m_IsPanning) {
+        ImVec2 delta(io.MousePos.x - m_LastMousePos.x, io.MousePos.y - m_LastMousePos.y);
+        m_PanOffset.x += delta.x;
+        m_PanOffset.y += delta.y;
+        m_LastMousePos = io.MousePos;
+    }
+
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Middle)) {
+        m_IsPanning = false;
+    }
+
     for (auto &block : m_Blocks) {
-        UpdateCanvasBlock(block, events);
+        UpdateCanvasBlock(*this, block, events);
     }
 }
 
@@ -365,8 +393,30 @@ void Canvas::Draw(UIEventQueue &events)
 
 
     ImGui::BeginChild("CanvasFrame", canvasSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    // Grid
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    ImVec2 winPos = ImGui::GetWindowPos();
+    ImVec2 winSize = ImGui::GetWindowSize();
+
+    for (float x = fmodf(m_PanOffset.x, GRID_STEP); x < winSize.x; x += GRID_STEP) {
+        drawList->AddLine(
+                ImVec2(winPos.x + x, winPos.y),
+                ImVec2(winPos.x + x, winPos.y + winSize.y),
+                GRID_COLOR);
+    }
+
+    for (float y = fmodf(m_PanOffset.y, GRID_STEP); y < winSize.y; y += GRID_STEP) {
+        drawList->AddLine(
+                ImVec2(winPos.x, winPos.y + y),
+                ImVec2(winPos.x + winSize.x, winPos.y + y),
+                GRID_COLOR);
+    }
+
+    // Blocks
     for (auto &block : m_Blocks) {
-        DrawCanvasBlock(block, events);
+        DrawCanvasBlock(*this, block, events);
 
 #ifndef NDEBUG
         if (block.isHovered) {
@@ -383,7 +433,7 @@ void Canvas::InstanceBlock(const BlockData &data)
 {
     ImGuiIO &io = ImGui::GetIO();
 
-    ImVec2 spawnPos = io.MousePos;
+    ImVec2 spawnPos = ScreenToWorld(io.MousePos);
 
     BlockInstance instance {
         .id         = m_NextId++,
@@ -488,6 +538,16 @@ void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &i
         current = inst->nextId;
         callback(*inst);
     }
+}
+
+ImVec2 Canvas::WorldToScreen(ImVec2 pos)
+{
+    return ImVec2(pos.x + m_PanOffset.x, pos.y + m_PanOffset.y);
+}
+
+ImVec2 Canvas::ScreenToWorld(ImVec2 pos)
+{
+    return ImVec2(pos.x - m_PanOffset.x, pos.y - m_PanOffset.y);
 }
 
 void Canvas::BringToFront(uint32_t id)

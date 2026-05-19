@@ -117,9 +117,6 @@ struct BlockInstance
     ImVec2 dragOffset = ImVec2(0.0f, 0.0f);
 };
 
-void DrawCanvasBlock(BlockInstance &Block, UIEventQueue &events);
-void UpdateCanvasBlock(BlockInstance &block, UIEventQueue &events);
-
 class Sidebar
 {
     public:
@@ -167,6 +164,9 @@ class Canvas
 
         void WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback);
 
+        ImVec2 WorldToScreen(ImVec2 pos);
+        ImVec2 ScreenToWorld(ImVec2 pos);
+
         std::optional<AttachTarget> FindAttachTarget(const BlockInstance &instance);
         std::vector<BlockInstance>::iterator FindBlockById(uint32_t id);
         int32_t FindIdxById(uint32_t id);
@@ -176,7 +176,14 @@ class Canvas
     private:
         std::vector<BlockInstance> m_Blocks;
         uint32_t m_NextId = 1;
+
+        bool m_IsPanning = false;
+        ImVec2 m_PanOffset = ImVec2(0.0, 0.0);
+        ImVec2 m_LastMousePos = ImVec2(0.0, 0.0);
 };
+
+void DrawCanvasBlock(Canvas &canvas, BlockInstance &Block, UIEventQueue &events);
+void UpdateCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events);
 
 class UI
 {
