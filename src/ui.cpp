@@ -431,9 +431,17 @@ void Canvas::AttachInstance(uint32_t id, AttachTarget target)
 {
     auto instance = FindBlockById(id);
     auto prev = FindBlockById(target.id);
+
     prev->nextId = id;
     instance->prevId = prev->id;
-    instance->pos = ImVec2(target.pos.x - BLOCK_NOTCH_OFFSET, target.pos.y);
+
+    ImVec2 newPos = ImVec2(target.pos.x - BLOCK_NOTCH_OFFSET, target.pos.y);
+    ImVec2 delta = ImVec2(newPos.x - instance->pos.x, newPos.y - instance->pos.y);
+
+    WalkBlockSequence(id, [&delta](BlockInstance &inst) {
+                inst.pos.x += delta.x;
+                inst.pos.y += delta.y;
+            });
     LOG_DEBUG("attached block id=%u to block id=%u", id, prev->id);
 }
 
