@@ -3,6 +3,7 @@
 #include <cctype>
 #include <iostream>
 #include <algorithm>
+#include <unordered_set>
 
 #include "ui.hpp"
 #include "log.hpp"
@@ -468,8 +469,16 @@ void Canvas::DetachInstane(uint32_t id)
 
 void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback)
 {
+    std::unordered_set<uint32_t> visited;
+
     uint32_t current = id;
     while (current != 0) {
+        if (visited.find(current) != visited.end()) {
+            LOG_ERROR("cycle detected at %u", current);
+            break;
+        }
+        visited.insert(current);
+
         auto inst = FindBlockById(current);
         if (inst == m_Blocks.end()) {
             LOG_ERROR("block %u not found", id);
