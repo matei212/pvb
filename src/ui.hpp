@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <optional>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -100,11 +101,16 @@ struct BlockInstance
     ImVec2 pos;
     ImVec2 size;
 
+    // Conections
+    uint32_t prevId = 0;
+    uint32_t nextId = 0;
+
     // Input state
     bool isDragging = false;
     bool isMouseDown = false;
     bool isMenuOpen = false;
     bool isActive = false;
+    bool isHovered = false;
     ImVec2 mouseDownPos = ImVec2(0.0f, 0.0f);
     ImVec2 dragOffset = ImVec2(0.0f, 0.0f);
 };
@@ -126,6 +132,12 @@ class Sidebar
         std::vector <BlockData> m_Blocks;
 };
 
+struct AttachTarget
+{
+    uint32_t id;
+    ImVec2 pos;
+};
+
 class Canvas
 {
     public:
@@ -140,7 +152,12 @@ class Canvas
         void DeleteInstance(uint32_t id);
         void BringToFront(uint32_t id);
         void DuplicateInstance(uint32_t id);
+        void AttachInstance(uint32_t id, AttachTarget target);
+        void DetachInstane(uint32_t id);
 
+        void WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback);
+
+        std::optional<AttachTarget> FindAttachTarget(const BlockInstance &instance);
         std::vector<BlockInstance>::iterator FindBlockById(uint32_t id);
         int32_t FindIdxById(uint32_t id);
 

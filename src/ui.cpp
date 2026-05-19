@@ -247,6 +247,7 @@ void DrawCanvasBlock(BlockInstance &block, UIEventQueue &events)
     ImGui::SetCursorScreenPos(block.pos);
     ImGui::InvisibleButton("##block", block.size);
     block.isActive = ImGui::IsItemActive();
+    block.isHovered = ImGui::IsItemHovered();
 
     block.isMenuOpen = ImGui::BeginPopupContextItem("##ctx", ImGuiMouseButton_Right);
     if (block.isMenuOpen) {
@@ -363,6 +364,13 @@ void Canvas::Draw(UIEventQueue &events)
     ImGui::BeginChild("CanvasFrame", canvasSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     for (auto &block : m_Blocks) {
         DrawCanvasBlock(block, events);
+
+#ifndef NDEBUG
+        if (block.isHovered) {
+            ImGui::SetTooltip("Debug: id=%u, prevId=%u, nextId=%u", block.id, block.prevId, block.nextId);
+        }
+#endif
+
     }
     ImGui::EndChild();
 
@@ -407,8 +415,52 @@ void Canvas::DeleteInstance(uint32_t id)
         return;
     }
 
+    BlockInstance &inst = m_Blocks[idx];
+    if (inst.prevId != 0) {
+        auto prev = FindBlockById(inst.prevId);
+        prev->nextId = 0;
+    }
+
     m_Blocks.erase(m_Blocks.begin() + idx);
     LOG_DEBUG("deleted block with id %u", id);
+}
+
+void Canvas::AttachInstance(uint32_t id, AttachTarget target)
+{
+    auto instance = FindBlockById(id);
+    auto prev = FindBlockById(target.id);
+    prev->nextId = id;
+    instance->prevId = prev->id;
+    instance->pos = ImVec2(target.pos.x - BLOCK_NOTCH_OFFSET, target.pos.y);
+    LOG_DEBUG("attached block id=%u to block id=%u", id, prev->id);
+}
+
+void Canvas::DetachInstane(uint32_t id)
+{
+    auto inst = FindBlockById(id);
+    if (inst->prevId == 0) {
+        LOG_ERROR("tried to detach block id=%u with no parent", id);
+    }
+
+    auto prev = FindBlockById(inst->prevId);
+    prev->nextId = 0;
+    inst->prevId = 0;
+    LOG_DEBUG("detached block id=%u from block id=%u", id, prev->id);
+}
+
+void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback)
+{
+    uint32_t current = id;
+    while (current != 0) {
+        auto inst = FindBlockById(current);
+        if (inst == m_Blocks.end()) {
+            LOG_ERROR("block %u not found", id);
+            return;
+        }
+
+        current = inst->nextId;
+        callback(*inst);
+    }
 }
 
 void Canvas::BringToFront(uint32_t id)
@@ -420,6 +472,30 @@ void Canvas::BringToFront(uint32_t id)
     }
 
     std::swap(m_Blocks[idx], m_Blocks.back());
+}
+
+std::optional<AttachTarget> Canvas::FindAttachTarget(const BlockInstance &instance)
+{
+    if (instance.data.definition->type == BlockType::Expression) return std::nullopt;
+
+    ImVec2 topNotch = ImVec2(instance.pos.x + BLOCK_NOTCH_OFFSET, instance.pos.y);
+
+    for (auto &inst : m_Blocks) {
+        if (inst.id == instance.id) continue;
+        if (inst.nextId != 0) continue;
+        if (inst.data.definition->type == BlockType::Expression) continue;
+
+        ImVec2 bottomNotch = ImVec2(inst.pos.x + BLOCK_NOTCH_OFFSET, inst.pos.y + inst.size.y);
+        float dx = topNotch.x - bottomNotch.x;
+        float dy = topNotch.y - bottomNotch.y;
+        float dist = sqrt(dx * dx + dy * dy);
+
+        if (dist <= BLOCK_SNAP_RADIUS) {
+            return AttachTarget { inst.id, bottomNotch };
+        }
+    }
+
+    return std::nullopt;
 }
 
 std::vector<BlockInstance>::iterator Canvas::FindBlockById(uint32_t id)
@@ -488,25 +564,52 @@ void UI::Update()
     for (const UIEvent &e : m_EventQueue.Drain()) {
         switch (e.type) {
             case UIEventType::BlockDragStarted:
-                LOG_DEBUG("drag started for block");
-                m_Canvas.IsDraggingBlock = true;
-                m_Canvas.BringToFront(e.id);
-                break;
-            case UIEventType::BlockDragEnded:
-                LOG_DEBUG("drag ended for block");
-                m_Canvas.IsDraggingBlock = false;
-                break;
-            case UIEventType::BlockInstanciateRequested:
-                LOG_DEBUG("block instanciation requested");
-                if (!m_Canvas.IsDraggingBlock) {
+                {
+                    LOG_DEBUG("drag started for block %u", e.id);
                     m_Canvas.IsDraggingBlock = true;
-                    m_Canvas.InstanceBlock(*e.data);
+                    m_Canvas.BringToFront(e.id);
+
+                    auto inst = m_Canvas.FindBlockById(e.id);
+                    if (inst->prevId != 0) {
+                        m_Canvas.DetachInstane(e.id);
+                    }
+
+                    break;
                 }
-                break;
+            case UIEventType::BlockDragEnded:
+                {
+                    LOG_DEBUG("drag ended for block %u", e.id);
+                    m_Canvas.IsDraggingBlock = false;
+
+                    auto instance = m_Canvas.FindBlockById(e.id);
+                    auto target = m_Canvas.FindAttachTarget(*instance);
+                    if (target) {
+                        m_Canvas.AttachInstance(e.id, target.value());
+                    }
+
+                    break;
+                }
+            case UIEventType::BlockInstanciateRequested:
+                {
+                    LOG_DEBUG("block instanciation requested");
+                    if (!m_Canvas.IsDraggingBlock) {
+                        m_Canvas.IsDraggingBlock = true;
+                        m_Canvas.InstanceBlock(*e.data);
+                    }
+                    break;
+                }
             case UIEventType::BlockDeleteReqested:
-                LOG_DEBUG("block deletion requested");
-                m_Canvas.DeleteInstance(e.id);
-                break;
+                {
+                    LOG_DEBUG("block deletion requested");
+
+                    auto inst = m_Canvas.FindBlockById(e.id);
+                    m_Canvas.WalkBlockSequence(
+                            inst->id,
+                            [this](BlockInstance &inst) { m_Canvas.DeleteInstance(inst.id); }
+                            );
+
+                    break;
+                }
             case UIEventType::BlockDuplicateReqested:
                 LOG_DEBUG("block duplication requested");
                 m_Canvas.DuplicateInstance(e.id);
