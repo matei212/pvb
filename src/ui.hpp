@@ -185,6 +185,18 @@ class Canvas
 void DrawCanvasBlock(Canvas &canvas, BlockInstance &Block, UIEventQueue &events);
 void UpdateCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events);
 
+class CodeView
+{
+    public:
+        CodeView() = default;
+        ~CodeView() = default;
+
+        void Draw();
+
+    private:
+        std::string m_Code = "Hello, World!";
+};
+
 class UI
 {
     public:
@@ -213,9 +225,11 @@ class UI
 
         Sidebar m_Sidebar;
         Canvas m_Canvas;
+        CodeView m_CodeView;
 
         bool m_ShowSidebar = true;
         bool m_ShowOutputPanel = false;
+        bool m_ShowCodeView = false;
 };
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {

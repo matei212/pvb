@@ -624,6 +624,26 @@ int32_t Canvas::FindIdxById(uint32_t id)
     return idx;
 }
 
+
+// CodeView
+void CodeView::Draw()
+{
+    ImGui::BeginChild("CodeView", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+
+    ImGui::SetWindowFontScale(1.3f);
+    ImGui::InputTextMultiline(
+            "##code",
+            &m_Code,
+            ImVec2(-FLT_MIN, -FLT_MIN),
+            ImGuiInputTextFlags_ReadOnly);
+    ImGui::SetWindowFontScale(1.0f);
+
+    ImGui::PopStyleVar();
+    ImGui::EndChild();
+}
+
+
 // UI
 void UI::Init()
 {
@@ -804,6 +824,7 @@ void UI::DrawMainMenuBar()
 {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("View")) {
+            ImGui::MenuItem("Code View", nullptr, &m_ShowCodeView);
             ImGui::MenuItem("Output Panel", nullptr, &m_ShowOutputPanel);
             ImGui::MenuItem("Sidebar", nullptr, &m_ShowSidebar);
             ImGui::EndMenu();
@@ -834,9 +855,33 @@ void UI::DrawWorkspace()
     ImGui::BeginChild("Workspace", ImVec2(0.0f, workspaceHeight), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
-    if (m_ShowSidebar) m_Sidebar.Draw(m_EventQueue);
-    ImGui::SameLine();
-    m_Canvas.Draw(m_EventQueue);
+    if (m_ShowSidebar) {
+        m_Sidebar.Draw(m_EventQueue);
+        ImGui::SameLine();
+    }
+
+    if (m_ShowCodeView) {
+        if (ImGui::BeginTable(
+                    "WorkspaceSplit",
+                    2,
+                    ImGuiTableFlags_Resizable |
+                    ImGuiTableFlags_NoSavedSettings |
+                    ImGuiTableFlags_BordersInnerV))
+        {
+            ImGui::TableSetupColumn("Canvas", ImGuiTableColumnFlags_WidthStretch, 0.7f);
+            ImGui::TableSetupColumn("Code", ImGuiTableColumnFlags_WidthStretch, 0.3f);
+
+            ImGui::TableNextColumn();
+            m_Canvas.Draw(m_EventQueue);
+
+            ImGui::TableNextColumn();
+            m_CodeView.Draw();
+
+            ImGui::EndTable();
+        }
+    } else {
+        m_Canvas.Draw(m_EventQueue);
+    }
 
     ImGui::PopStyleVar();
     ImGui::EndChild();
