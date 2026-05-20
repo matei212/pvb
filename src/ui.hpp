@@ -127,7 +127,7 @@ struct BlockInstance
     ImVec2 pos;
     ImVec2 size;
 
-    std::vector<InputValue> inputs();
+    std::vector<InputValue> inputs;
 
     // Conections
     uint32_t prevId = 0;
@@ -201,6 +201,8 @@ class Canvas
         std::optional<AttachTarget> FindAttachTarget(const BlockInstance &instance);
         std::vector<BlockInstance>::iterator FindBlockById(uint32_t id);
         int32_t FindIdxById(uint32_t id);
+
+        std::vector<BlockInstance> &GetBlocks() { return m_Blocks; };
 
         bool IsDraggingBlock = false;
 

@@ -9,16 +9,28 @@
 #include "log.hpp"
 
 // Block
-static ImVec2 calcBlockSize(const BlockData &data);
-static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
-static ImU32 getCategoryColor(BlockCategory category);
+static void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, ValueType type);
+static void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float slotW, float slotH);
+static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos);
+
+static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
+static float calcLiteralWidth(const char *text, ValueType type);
+
+static ImVec2 calcSidebarBlockSize(const BlockData &data);
 static float calcTokenWidth(const BlockToken &tok);
-static float calcInputWidth(const char *text, float minW, float maxW);
+static float calcSidebarInputWidth(const char *text, float minW, float maxW);
+
+static float calcCanvasInputWidth(Canvas &canvas, const InputValue &input);
+static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block);
+
+static ImU32 getCategoryColor(BlockCategory category);
 
 static BlockToken parseBlockInput(const char **ch, const char * end);
 static ValueType parseValueType(const std::string &str);
+
+static std::vector<InputValue> buildDefaultInputs(const BlockData &data);
 
 BlockData::BlockData(const BlockDefinition *def)
     : definition(def)
@@ -65,7 +77,7 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
 {
     ImGui::PushID(&data);
 
-    ImVec2 size = calcBlockSize(data);
+    ImVec2 size = calcSidebarBlockSize(data);
     ImGui::Dummy(size);
     ImVec2 pos = ImGui::GetItemRectMin();
     bool hovered = ImGui::IsItemHovered();
@@ -87,7 +99,7 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     ImGui::PopID();
 }
 
-ImVec2 calcBlockSize(const BlockData &data)
+ImVec2 calcSidebarBlockSize(const BlockData &data)
 {
     float width = BLOCK_HPAD * 2.0f;
 
@@ -108,6 +120,28 @@ ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
 {
     ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
     return ImVec2(pos.x + BLOCK_HPAD, pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5f);
+}
+
+float calcLiteralWidth(const char *text, ValueType type)
+{
+    if (type & Value_String) {
+        return calcSidebarInputWidth(
+                text,
+                BLOCK_STR_INPUT_MINW,
+                BLOCK_STR_INPUT_MAXW);
+    } else if (type == Value_Int) {
+        return calcSidebarInputWidth(
+                text,
+                BLOCK_INT_INPUT_MINW,
+                BLOCK_INT_INPUT_MAXW);
+    } else if (type & Value_Number) {
+        return calcSidebarInputWidth(
+                text,
+                BLOCK_FLOAT_INPUT_MINW,
+                BLOCK_FLOAT_INPUT_MAXW);
+    }
+
+    return 0.0f;
 }
 
 void drawBlockShape(float x, float y, float width, float height, BlockType type, BlockCategory category)
@@ -165,6 +199,72 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
             ImGui::PopID();
         }
         cursorPos.x += width + BLOCK_HSPACE;
+    }
+}
+
+void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, ValueType type)
+{
+    ImGui::SetCursorScreenPos(cursorPos);
+    ImGui::SetNextItemWidth(width);
+    ImGui::PushID(id);
+    ImGui::PushID(inputIndex);
+
+    if (type & Value_String) {
+        ImGui::InputText("##s", &literal);
+    } else if (type == Value_Int) {
+        int value = literal.empty() ? 0 : std::stoi(literal);
+        if (ImGui::InputScalar("##i", ImGuiDataType_S32, &value, nullptr, nullptr)) {
+            literal = std::to_string(value);
+        }
+    } else if (type & Value_Number) {
+        float value = literal.empty() ? 0 : std::stof(literal);
+        if (ImGui::InputScalar( "##f", ImGuiDataType_Float, &value, nullptr, nullptr, "%g")) {
+            literal = std::to_string(value);
+        }
+    }
+
+    ImGui::PopID();
+    ImGui::PopID();
+}
+
+void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float, float slotHeight)
+{
+    expr.size = calcCanvasBlockSize(canvas, expr);
+    ImVec2 drawPos = ImVec2(cursorPos.x, cursorPos.y + (slotHeight - expr.size.y) * 0.5f);
+    drawBlockShape(drawPos.x, drawPos.y, expr.size.x, expr.size.y, expr.data.definition->type, expr.data.definition->category);
+    drawCanvasTokens(canvas, expr, blockTextOrigin(drawPos, expr.data.definition));
+}
+
+static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos)
+{
+    size_t inputIndex = 0;
+
+    for (size_t i = 0; i < block.data.tokens.size(); i++) {
+        const BlockToken &tok = block.data.tokens[i];
+        ImGui::SetCursorScreenPos(cursorPos);
+
+        if (tok.type == BlockTokenType::Text) {
+            ImVec2 size = ImGui::CalcTextSize(tok.text.c_str());
+            ImGui::TextUnformatted(tok.text.c_str());
+            cursorPos.x += size.x + BLOCK_HSPACE;
+            continue;
+        }
+
+        InputValue &input = block.inputs[inputIndex];
+        float width = calcCanvasInputWidth(canvas, input);
+
+        if (input.connectedBlockId != 0) {
+            auto child = canvas.FindBlockById(input.connectedBlockId);
+            if (canvas.FindIdxById(input.connectedBlockId) != -1) {
+                drawEmbeddedExpressionBlock(canvas, *child, cursorPos, width, BLOCK_HEIGHT);
+            }
+            ImGui::PopID();
+        } else {
+            drawLiteralInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, input.type);
+        }
+
+        cursorPos.x += width + BLOCK_HSPACE;
+        inputIndex++;
     }
 }
 
@@ -255,33 +355,36 @@ static ValueType parseValueType(const std::string &str)
     return Value_None;
 }
 
+static std::vector<InputValue> buildDefaultInputs(const BlockData &data)
+{
+    std::vector<InputValue> result;
+
+    for (const BlockToken& tok : data.tokens) {
+        if (tok.type != BlockTokenType::Input)
+            continue;
+
+        InputValue input;
+        input.type = tok.acceptedTypes;
+        input.literal = tok.defaultValue;
+
+        result.push_back(std::move(input));
+    }
+
+    return result;
+}
+
 static float calcTokenWidth(const BlockToken &tok)
 {
     if (tok.type == BlockTokenType::Text) {
         return ImGui::CalcTextSize(tok.text.c_str()).x;
     } else if (tok.type == BlockTokenType::Input) {
-        if (tok.acceptedTypes & Value_String) {
-            return calcInputWidth(
-                    tok.defaultValue.c_str(),
-                    BLOCK_STR_INPUT_MINW,
-                    BLOCK_STR_INPUT_MAXW);
-        } else if (tok.acceptedTypes == Value_Int) {
-            return calcInputWidth(
-                        tok.defaultValue.c_str(),
-                        BLOCK_INT_INPUT_MINW,
-                        BLOCK_INT_INPUT_MAXW);
-        } else if (tok.acceptedTypes & Value_Number) {
-            return calcInputWidth(
-                        tok.defaultValue.c_str(),
-                        BLOCK_FLOAT_INPUT_MINW,
-                        BLOCK_FLOAT_INPUT_MAXW);
-        }
+        return calcLiteralWidth(tok.defaultValue.c_str(), tok.acceptedTypes);
     }
 
     return 0.0f;
 }
 
-static float calcInputWidth(const char *text, float minW, float maxW)
+static float calcSidebarInputWidth(const char *text, float minW, float maxW)
 {
     ImGuiStyle &style = ImGui::GetStyle();
 
@@ -293,6 +396,39 @@ static float calcInputWidth(const char *text, float minW, float maxW)
         8.0f; // breathing room
 
     return std::clamp(width, minW, maxW);
+}
+
+float calcCanvasInputWidth(Canvas &canvas, const InputValue &input)
+{
+    if (input.connectedBlockId != 0) {
+        auto it = canvas.FindBlockById(input.connectedBlockId);
+
+        if (it != canvas.GetBlocks().end()) {
+            return it->size.x;
+        }
+    }
+
+    return calcLiteralWidth(input.literal.c_str(), input.type);
+}
+
+static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block)
+{
+    float width = BLOCK_HPAD * 2.0f;
+    size_t inputIndex = 0;
+
+    for (const BlockToken& tok : block.data.tokens) {
+        if (tok.type == BlockTokenType::Text) {
+            width += ImGui::CalcTextSize(tok.text.c_str()).x;
+        } else {
+            width += calcCanvasInputWidth(canvas, block.inputs[inputIndex]);
+            inputIndex++;
+        }
+
+        width += BLOCK_HSPACE;
+    }
+
+    width = std::max(width, BLOCK_MIN_WIDTH);
+    return ImVec2(width, BLOCK_HEIGHT);
 }
 
 // Block Instance
@@ -320,7 +456,7 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
     ImGui::PushID(static_cast<int>(block.id));
 
     ImVec2 screenPos = canvas.WorldToScreen(block.pos);
-    block.size = calcBlockSize(block.data);
+    block.size = calcCanvasBlockSize(canvas, block);
     drawBlockShape(
             screenPos.x,
             screenPos.y,
@@ -329,10 +465,10 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
             block.data.definition->type,
             block.data.definition->category);
 
-    drawBlockTokens(
-            blockTextOrigin(screenPos, block.data.definition),
-            block.data.tokens
-            );
+    drawCanvasTokens(
+            canvas,
+            block,
+            blockTextOrigin(screenPos, block.data.definition));
 
     ImGui::SetCursorScreenPos(screenPos);
     ImGui::InvisibleButton("##block", block.size);
@@ -517,7 +653,8 @@ void Canvas::InstanceBlock(const BlockData &data)
         .id         = m_NextId++,
             .data       = data,
             .pos        = spawnPos,
-            .size       = calcBlockSize(data),
+            .size       = calcSidebarBlockSize(data),
+            .inputs     = buildDefaultInputs(data),
             .isDragging = true,
     };
     m_Blocks.push_back(std::move(instance));
@@ -532,7 +669,8 @@ void Canvas::DuplicateInstance(uint32_t id)
         .id         = m_NextId++,
             .data       = original->data,
             .pos        = ImVec2(original->pos.x + 40.0, original->pos.y + 40.0),
-            .size       = calcBlockSize(original->data),
+            .size       = calcSidebarBlockSize(original->data),
+            .inputs     = buildDefaultInputs(original->data),
     };
     m_Blocks.push_back(std::move(inst));
     LOG_DEBUG("duplicated instance id=%u at (%.0f, %.0f) with id=%u", id, inst.pos.x, inst.pos.y, inst.id);
