@@ -277,6 +277,8 @@ static ImU32 getCategoryColor(BlockCategory category)
             return CATEGORY_EVENT_COLOR;
         case BlockCategory::Console:
             return CATEGORY_CONSOLE_COLOR;
+        case BlockCategory::ControlFlow:
+            return CATEGORY_CONTROL_COLOR;
         case BlockCategory::Math:
             return CATEGORY_MATH_COLOR;
         case BlockCategory::Logic:

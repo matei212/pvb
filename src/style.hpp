@@ -26,10 +26,11 @@ inline constexpr float BLOCK_FLOAT_INPUT_MAXW = 70.0f;
 inline constexpr float BLOCK_DRAG_THRESH = 5.0f;
 inline constexpr float BLOCK_SNAP_RADIUS = 15.0f;
 
-inline constexpr ImU32 CATEGORY_EVENT_COLOR = IM_COL32(49, 196, 49, 255);
+inline constexpr ImU32 CATEGORY_EVENT_COLOR   = IM_COL32(49, 196, 49, 255);
 inline constexpr ImU32 CATEGORY_CONSOLE_COLOR = IM_COL32(49, 96, 146, 255);
-inline constexpr ImU32 CATEGORY_MATH_COLOR = IM_COL32(113, 49, 196, 255);
-inline constexpr ImU32 CATEGORY_LOGIC_COLOR = IM_COL32(49, 167, 196, 196);
+inline constexpr ImU32 CATEGORY_CONTROL_COLOR = IM_COL32(196, 128, 10, 255);
+inline constexpr ImU32 CATEGORY_MATH_COLOR    = IM_COL32(113, 49, 196, 255);
+inline constexpr ImU32 CATEGORY_LOGIC_COLOR   = IM_COL32(49, 167, 196, 255);
 
 inline constexpr float GRID_STEP = 42.0f;
 inline constexpr ImU32 GRID_COLOR = IM_COL32(50, 50, 50, 255);
