@@ -25,12 +25,15 @@ static float calcSidebarInputWidth(const char *text, float minW, float maxW);
 static float calcCanvasInputWidth(Canvas &canvas, const InputValue &input);
 static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block);
 
+static bool rectsOverlap(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax);
+
 static ImU32 getCategoryColor(BlockCategory category);
 
 static BlockToken parseBlockInput(const char **ch, const char * end);
 static ValueType parseValueType(const std::string &str);
 
 static std::vector<InputValue> buildDefaultInputs(const BlockData &data);
+
 
 BlockData::BlockData(const BlockDefinition *def)
     : definition(def)
@@ -255,10 +258,9 @@ static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursor
 
         if (input.connectedBlockId != 0) {
             auto child = canvas.FindBlockById(input.connectedBlockId);
-            if (canvas.FindIdxById(input.connectedBlockId) != -1) {
+            if (child != canvas.GetBlocks().end()) {
                 drawEmbeddedExpressionBlock(canvas, *child, cursorPos, width, BLOCK_HEIGHT);
             }
-            ImGui::PopID();
         } else {
             drawLiteralInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, input.type);
         }
@@ -429,6 +431,14 @@ static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block)
 
     width = std::max(width, BLOCK_MIN_WIDTH);
     return ImVec2(width, BLOCK_HEIGHT);
+}
+
+static bool rectsOverlap(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax)
+{
+    return aMin.x <= bMax.x
+        && aMax.x >= bMin.x
+        && aMin.y <= bMax.y
+        && aMax.y >= bMin.y;
 }
 
 // Block Instance
@@ -630,11 +640,12 @@ void Canvas::Draw(UIEventQueue &events)
 
     // Blocks
     for (auto &block : m_Blocks) {
+        if (block.parentBlockId != 0) continue;
         DrawCanvasBlock(*this, block, events);
 
 #ifndef NDEBUG
         if (block.isHovered) {
-            ImGui::SetTooltip("Debug: id=%u, prevId=%u, nextId=%u", block.id, block.prevId, block.nextId);
+            ImGui::SetTooltip("Debug: id=%u, prevId=%u, nextId=%u, parentId=%u", block.id, block.prevId, block.nextId, block.parentBlockId);
         }
 #endif
 
@@ -689,6 +700,14 @@ void Canvas::DeleteInstance(uint32_t id)
         auto prev = FindBlockById(inst.prevId);
         prev->nextId = 0;
     }
+    if (inst.parentBlockId != 0) {
+        auto parent = FindBlockById(inst.parentBlockId);
+        if (parent != m_Blocks.end()
+            && inst.parentInputIndex >= 0
+            && static_cast<size_t>(inst.parentInputIndex) < parent->inputs.size()) { 
+            parent->inputs[inst.parentInputIndex].connectedBlockId = 0;
+        }
+    }
 
     m_Blocks.erase(m_Blocks.begin() + idx);
     LOG_DEBUG("deleted block with id %u", id);
@@ -733,6 +752,47 @@ void Canvas::DetachInstane(uint32_t id)
     LOG_DEBUG("detached block id=%u from block id=%u", id, prev->id);
 }
 
+void Canvas::AttachExpressionBlock(uint32_t exprId, uint32_t parentId, uint32_t inputIndex)
+{
+    auto expr = FindBlockById(exprId);
+    auto parent = FindBlockById(parentId);
+    if (expr == m_Blocks.end() || parent == m_Blocks.end()) {
+        LOG_ERROR("failed to attach expression block id=%u to parent id=%u", exprId, parentId);
+        return;
+    }
+
+    if (inputIndex >= parent->inputs.size()) {
+        LOG_ERROR("input index %u out of range for block id=%u", inputIndex, parentId);
+        return;
+    }
+
+    expr->parentBlockId = parentId;
+    expr->parentInputIndex = inputIndex;
+    parent->inputs[inputIndex].connectedBlockId = exprId;
+
+    LOG_DEBUG("attached expression block id=%u to block id=%u input %u", exprId, parentId, inputIndex);
+}
+
+void Canvas::DetachExpressionBlock(uint32_t exprId)
+{
+    auto expr = FindBlockById(exprId);
+    if (expr == m_Blocks.end()) return;
+
+    if (expr->parentBlockId == 0) return;
+
+    auto parent = FindBlockById(expr->parentBlockId);
+    if (parent != m_Blocks.end()
+            && expr->parentInputIndex >= 0
+            && static_cast<size_t>(expr->parentInputIndex) < parent->inputs.size()) {
+        parent->inputs[expr->parentInputIndex].connectedBlockId = 0;
+    }
+
+    expr->parentBlockId = 0;
+    expr->parentInputIndex = -1;
+
+    LOG_DEBUG("detached expression block id=%u", exprId);
+}
+
 void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback)
 {
     std::unordered_set<uint32_t> visited;
@@ -753,6 +813,105 @@ void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &i
 
         current = inst->nextId;
         callback(*inst);
+    }
+}
+
+void Canvas::MoveAttachedExpression(BlockInstance &parent)
+{
+    ImVec2 cursor = blockTextOrigin(parent.pos, parent.data.definition);
+
+    size_t inputIndex = 0;
+
+    for (const BlockToken &tok : parent.data.tokens) {
+        if (tok.type == BlockTokenType::Text) {
+            cursor.x += ImGui::CalcTextSize(tok.text.c_str()).x + BLOCK_HSPACE;
+            continue;
+        }
+
+        InputValue &input = parent.inputs[inputIndex];
+        float width = calcCanvasInputWidth(*this, input);
+
+        if (input.connectedBlockId != 0) {
+            auto child = FindBlockById(input.connectedBlockId);
+
+            if (child != m_Blocks.end()) {
+                child->size = calcCanvasBlockSize(*this, *child);
+
+                child->pos = ImVec2(
+                        cursor.x,
+                        cursor.y + (BLOCK_HEIGHT - child->size.y) * 0.5f
+                        );
+
+                MoveAttachedExpression(*child);
+            }
+        }
+
+        cursor.x += width + BLOCK_HSPACE;
+        inputIndex++;
+    }
+}
+
+void Canvas::CollectBlockTree(uint32_t id, std::unordered_set<uint32_t>& visited)
+{
+    if (id == 0) return;
+
+    if (visited.find(id) != visited.end())
+        return;
+
+    auto inst = FindBlockById(id);
+    if (inst == m_Blocks.end())
+        return;
+
+    visited.insert(id);
+
+    // Follow statement chain
+    if (inst->nextId != 0) {
+        CollectBlockTree(inst->nextId, visited);
+    }
+
+    // Follow expression children
+    for (const InputValue& input : inst->inputs) {
+        if (input.connectedBlockId != 0) {
+            CollectBlockTree(input.connectedBlockId, visited);
+        }
+    }
+}
+
+void Canvas::AppendBlockInputSockets(BlockInstance &block)
+{
+    block.size = calcCanvasBlockSize(*this, block);
+
+    ImVec2 cursor = blockTextOrigin(block.pos, block.data.definition);
+    size_t inputIndex = 0;
+
+    for (const BlockToken &tok : block.data.tokens) {
+        if (tok.type == BlockTokenType::Text) {
+            cursor.x += ImGui::CalcTextSize(tok.text.c_str()).x + BLOCK_HSPACE;
+            continue;
+        }
+
+        float width = calcCanvasInputWidth(*this, block.inputs[inputIndex]);
+
+        InputSocket socket;
+        socket.pos = cursor;
+        socket.size = ImVec2(width, BLOCK_HEIGHT);
+        socket.ownerBlockId = block.id;
+        socket.inputIndex = static_cast<uint32_t>(inputIndex);
+        socket.acceptedTypes = tok.acceptedTypes;
+        m_InputSockets.push_back(socket);
+
+        cursor.x += width + BLOCK_HSPACE;
+        inputIndex++;
+    }
+}
+
+void Canvas::RebuildInputSockets()
+{
+    m_InputSockets.clear();
+
+    for (auto &block : m_Blocks) {
+        if (block.parentBlockId != 0) continue;
+        AppendBlockInputSockets(block);
     }
 }
 
@@ -811,6 +970,37 @@ std::optional<AttachTarget> Canvas::FindAttachTarget(const BlockInstance &instan
                 return AttachTarget { target.id, targetTopNotch, target.size, AttachType::TopNotch };
             }
         }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<InputSocket> Canvas::FindInputSocketTarget(const BlockInstance &instance)
+{
+    if (instance.data.definition->type != BlockType::Expression) return std::nullopt;
+    if (instance.data.definition->outputType == Value_None) return std::nullopt;
+
+    std::optional<InputSocket> best;
+    for (const InputSocket &socket : m_InputSockets) {
+        if (socket.ownerBlockId == instance.id) continue;
+        if (FindIdxById(socket.ownerBlockId) == -1) continue;
+
+        auto owner = FindBlockById(socket.ownerBlockId);
+
+        if ((socket.acceptedTypes & instance.data.definition->outputType) == 0) continue;
+        if (owner->inputs[socket.inputIndex].connectedBlockId != 0
+            && owner->inputs[socket.inputIndex].connectedBlockId != instance.id) {
+            continue;
+        }
+
+        bool overlaps = rectsOverlap(
+                instance.pos,
+                ImVec2(instance.pos.x + instance.size.x, instance.pos.y + instance.size.y), 
+                socket.pos,
+                ImVec2(socket.pos.x + socket.size.x, socket.pos.y + socket.size.y));
+        if (!overlaps) continue;
+
+        return socket;
     }
 
     return std::nullopt;
@@ -909,12 +1099,16 @@ void UI::Update()
                     m_Canvas.WalkBlockSequence(
                             e.id,
                             [this](BlockInstance &inst) {
-                            m_Canvas.BringToFront(inst.id);
-                            }
-                            );
+                                m_Canvas.BringToFront(inst.id);
+                                m_Canvas.MoveAttachedExpression(inst);
+                            });
 
                     auto inst = m_Canvas.FindBlockById(e.id);
-                    if (inst->prevId != 0) {
+                    if (inst->data.definition->type == BlockType::Expression) {
+                        if (inst->parentBlockId != 0) {
+                            m_Canvas.DetachExpressionBlock(e.id);
+                        }
+                    } else if (inst->prevId != 0) {
                         m_Canvas.DetachInstane(e.id);
                     }
 
@@ -934,9 +1128,23 @@ void UI::Update()
                     m_Canvas.IsDraggingBlock = false;
 
                     auto instance = m_Canvas.FindBlockById(e.id);
-                    auto target = m_Canvas.FindAttachTarget(*instance);
-                    if (target) {
-                        m_Canvas.AttachInstance(e.id, target.value());
+
+                    if (instance->data.definition->type != BlockType::Expression) {
+                        auto target = m_Canvas.FindAttachTarget(*instance);
+                        if (target) {
+                            m_Canvas.AttachInstance(e.id, target.value());
+                        }
+                    } else {
+                        m_Canvas.RebuildInputSockets();
+                        auto socket = m_Canvas.FindInputSocketTarget(*instance);
+                        if (socket) {
+                            instance->pos = socket->pos;
+                            m_Canvas.AttachExpressionBlock(e.id, socket->ownerBlockId, socket->inputIndex);
+
+                            auto parent = m_Canvas.FindBlockById(socket->ownerBlockId);
+                            m_Canvas.MoveAttachedExpression(*parent);
+                        }
+                        LOG_DEBUG("attached block %u to socket", instance->id);
                     }
 
                     break;
@@ -954,14 +1162,8 @@ void UI::Update()
                 {
                     LOG_DEBUG("block deletion requested");
 
-                    std::vector<uint32_t> ids;
-                    auto inst = m_Canvas.FindBlockById(e.id);
-                    m_Canvas.WalkBlockSequence(
-                            inst->id,
-                            [this, &ids](BlockInstance &inst) {
-                            ids.push_back(inst.id);
-                            });
-
+                    std::unordered_set<uint32_t> ids;
+                    m_Canvas.CollectBlockTree(e.id, ids);
                     for (uint32_t id : ids) {
                         m_Canvas.DeleteInstance(id);
                     }

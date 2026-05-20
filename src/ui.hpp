@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <optional>
+#include <unordered_set>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -61,6 +62,17 @@ struct InputValue
     ValueType type = Value_None;
     std::string literal; // when no expression block attached
     uint32_t connectedBlockId = 0;
+};
+
+struct InputSocket
+{
+    ImVec2 pos;
+    ImVec2 size;
+
+    uint32_t ownerBlockId;
+    uint32_t inputIndex;
+
+    ValueType acceptedTypes;
 };
 
 struct BlockToken
@@ -135,7 +147,7 @@ struct BlockInstance
 
     // Inputs
     uint32_t parentBlockId = 0;
-    uint32_t parentInputIndex = -1;
+    int32_t parentInputIndex = -1;
 
     // UI state
     bool isDragging = false;
@@ -193,12 +205,21 @@ class Canvas
         void AttachInstance(uint32_t id, AttachTarget target);
         void DetachInstane(uint32_t id);
 
+        void AttachExpressionBlock(uint32_t exprId, uint32_t parentId, uint32_t inputIndex);
+        void DetachExpressionBlock(uint32_t exprId);
+        void AppendBlockInputSockets(BlockInstance &block);
+        void RebuildInputSockets();
+
         void WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &inst)> callback);
+        void MoveAttachedExpression(BlockInstance &parent);
+
+        void CollectBlockTree(uint32_t id, std::unordered_set<uint32_t>& visited);
 
         ImVec2 WorldToScreen(ImVec2 pos);
         ImVec2 ScreenToWorld(ImVec2 pos);
 
         std::optional<AttachTarget> FindAttachTarget(const BlockInstance &instance);
+        std::optional<InputSocket> FindInputSocketTarget(const BlockInstance &instance);
         std::vector<BlockInstance>::iterator FindBlockById(uint32_t id);
         int32_t FindIdxById(uint32_t id);
 
@@ -209,6 +230,8 @@ class Canvas
     private:
         std::vector<BlockInstance> m_Blocks;
         uint32_t m_NextId = 1;
+
+        std::vector<InputSocket> m_InputSockets;
 
         bool m_IsPanning = false;
         ImVec2 m_PanOffset = ImVec2(0.0, 0.0);
@@ -267,7 +290,7 @@ class UI
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Event,       Value_None,   "Main",                                  "Main entry point",                                        BlockCategory::Event   },
-    BlockDefinition { BlockType::Instruction, Value_None,   "Write {string:text=Hello World}",          "Writes to the console",                                   BlockCategory::Console },
+    BlockDefinition { BlockType::Instruction, Value_None,   "Write {any:text=Hello World}",          "Writes to the console",                                   BlockCategory::Console },
     BlockDefinition { BlockType::Instruction, Value_None,   "Clear",                                 "Clears the console",                                      BlockCategory::Console },
     BlockDefinition { BlockType::Expression,  Value_Number, "{number:left=1} + {number:right=1}",    "Adds 2 numbers",                                          BlockCategory::Math    },
     BlockDefinition { BlockType::Expression,  Value_Number, "{number:left=1} - {number:right=1}",    "Subtracts 2 numbers",                                     BlockCategory::Math    },
