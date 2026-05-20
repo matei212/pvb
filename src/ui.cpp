@@ -14,10 +14,11 @@ static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static ImU32 getCategoryColor(BlockCategory category);
-static BlockToken parseBlockInput(const char **ch, const char * end);
 static float calcTokenWidth(const BlockToken &tok);
 static float calcInputWidth(const char *text, float minW, float maxW);
 
+static BlockToken parseBlockInput(const char **ch, const char * end);
+static ValueType parseValueType(const std::string &str);
 
 BlockData::BlockData(const BlockDefinition *def)
     : definition(def)
@@ -45,6 +46,18 @@ BlockData::BlockData(const BlockDefinition *def)
 
         ch ++;
     }
+
+#ifndef NDEBUG
+    for (auto &tok : tokens) {
+        if (tok.type == BlockTokenType::Input) {
+            LOG_DEBUG("BlockToken type=input inputName=%s defaultValue=%s", tok.inputName.c_str(), tok.defaultValue.c_str());
+        } else if (tok.type == BlockTokenType::Text) {
+            LOG_DEBUG("BlockToken type=text text=%s", tok.text.c_str());
+        } else {
+            LOG_WARN("BlockToken shouldn't have type %d", static_cast<int>(tok.type));
+        }
+    }
+#endif
 
 }
 
@@ -126,81 +139,32 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
         BlockToken &tok = tokens[i];
         ImGui::SetCursorScreenPos(cursorPos);
 
-        switch (tok.type) {
-            case BlockTokenType::Text:
-                {
-                    ImVec2 size = ImGui::CalcTextSize(tok.text.c_str());
-                    ImGui::TextUnformatted(tok.text.c_str());
-                    cursorPos.x += size.x + BLOCK_HSPACE;
-                    break;
-                }
-
-            case BlockTokenType::StringInput:
-                {
-                    float width = calcInputWidth(
-                            tok.strValue.c_str(),
-                            BLOCK_STR_INPUT_MINW,
-                            BLOCK_STR_INPUT_MAXW);
-
-                    ImGui::SetNextItemWidth(width);
-                    ImGui::PushID(i);
-                    ImGui::InputText("##s", &tok.strValue);
-                    ImGui::PopID();
-
-                    cursorPos.x += width + BLOCK_HSPACE;
-                    break;
-                }
-
-            case BlockTokenType::IntInput:
-                {
-                    char buf[32];
-                    snprintf(buf, sizeof(buf), "%d", tok.intValue);
-
-                    float width = calcInputWidth(
-                            buf,
-                            BLOCK_INT_INPUT_MINW,
-                            BLOCK_INT_INPUT_MAXW);
-
-                    ImGui::SetNextItemWidth(width);
-
-                    ImGui::PushID(i);
-                    ImGui::InputScalar(
-                            "##i",
-                            ImGuiDataType_S32,
-                            &tok.intValue,
-                            nullptr,
-                            nullptr);
-                    ImGui::PopID();
-
-                    cursorPos.x += width + BLOCK_HSPACE;
-                    break;
-                }
-
-            case BlockTokenType::FloatInput:
-                {
-                    char buf[64];
-                    snprintf(buf, sizeof(buf), "%g", tok.floatValue);
-
-                    float width = calcInputWidth(
-                            buf,
-                            BLOCK_FLOAT_INPUT_MINW,
-                            BLOCK_FLOAT_INPUT_MAXW);
-
-                    ImGui::SetNextItemWidth(width);
-                    ImGui::PushID(i);
-                    ImGui::InputScalar(
-                            "##f",
-                            ImGuiDataType_Float,
-                            &tok.floatValue,
-                            nullptr,
-                            nullptr,
-                            "%g");
-                    ImGui::PopID();
-
-                    cursorPos.x += width + BLOCK_HSPACE;
-                    break;
-                }
+        float width = calcTokenWidth(tok);
+        if (tok.type == BlockTokenType::Text) {
+            ImGui::TextUnformatted(tok.text.c_str());
+        } else if (tok.acceptedTypes & Value_String) {
+            ImGui::SetNextItemWidth(width);
+            ImGui::PushID(i);
+            ImGui::InputText("##s", &tok.defaultValue);
+            ImGui::PopID();
+        } else if (tok.acceptedTypes == Value_Int) {
+            ImGui::SetNextItemWidth(width);
+            ImGui::PushID(i);
+            int value = tok.defaultValue.empty() ? 0 : std::stoi(tok.defaultValue);
+            if (ImGui::InputScalar("##i", ImGuiDataType_S32, &value, nullptr, nullptr)) {
+                tok.defaultValue = std::to_string(value);
+            }
+            ImGui::PopID();
+        } else if (tok.acceptedTypes & Value_Number) {
+            ImGui::SetNextItemWidth(width);
+            ImGui::PushID(i);
+            float value = tok.defaultValue.empty() ? 0 : std::stof(tok.defaultValue);
+            if (ImGui::InputScalar( "##f", ImGuiDataType_Float, &value, nullptr, nullptr, "%g")) {
+                tok.defaultValue = std::to_string(value);
+            }
+            ImGui::PopID();
         }
+        cursorPos.x += width + BLOCK_HSPACE;
     }
 }
 
@@ -223,82 +187,95 @@ static ImU32 getCategoryColor(BlockCategory category)
 
 static BlockToken parseBlockInput(const char **ch, const char * end)
 {
-    BlockToken token;
+    BlockToken tok;
+    tok.type = BlockTokenType::Input;
 
     std::string typeStr;
+    std::string nameStr;
     std::string valStr;
-    std::string *str = &typeStr;
+
+    enum class ParseState
+    {
+        Type,
+        Name,
+        Value,
+    };
+
+    ParseState state = ParseState::Type;
 
     (*ch)++;
-    while (*ch != end && **ch != '}') {
-        if (str == &typeStr && std::isspace(**ch)) {
-            ch ++;
-            continue;
-        }
 
-        if (**ch == '=') {
-            str = &valStr;
+    while (*ch != end && **ch != '}') {
+        char c = **ch;
+
+        if (c == ':') {
+            state = ParseState::Name;
             (*ch)++;
             continue;
         }
 
-        *str += **ch;
+        if (c == '=') {
+            state = ParseState::Value;
+            (*ch)++;
+            continue;
+        }
+
+        switch (state) {
+            case ParseState::Type:
+                typeStr += c;
+                break;
+
+            case ParseState::Name:
+                nameStr += c;
+                break;
+
+            case ParseState::Value:
+                valStr += c;
+                break;
+        }
+
         (*ch)++;
     }
 
-    if (typeStr == "str") {
-        token.type = BlockTokenType::StringInput;
-        token.strValue = valStr;
-    } else if (typeStr == "int") {
-        token.type = BlockTokenType::IntInput;
-        token.intValue = std::stoi(valStr);
-    } else if (typeStr == "float") {
-        token.type = BlockTokenType::FloatInput;
-        token.floatValue = std::stof(valStr);
-    }else {
-        LOG_WARN("unknown block input type %s", typeStr.c_str());
-    }
+    tok.acceptedTypes = parseValueType(typeStr);
+    tok.inputName = nameStr;
+    tok.defaultValue = valStr;
+    return tok;
+}
 
-    return token;
+static ValueType parseValueType(const std::string &str)
+{
+    if (str == "int") return Value_Int;
+    if (str == "float") return Value_Float;
+    if (str == "number") return Value_Number;
+    if (str == "bool") return Value_Bool;
+    if (str == "string") return Value_String;
+    if (str == "any") return Value_Any;
+
+    return Value_None;
 }
 
 static float calcTokenWidth(const BlockToken &tok)
 {
-    switch (tok.type) {
-        case BlockTokenType::Text:
-            {
-                return ImGui::CalcTextSize(tok.text.c_str()).x;
-            }
-
-        case BlockTokenType::StringInput:
-            {
-                return calcInputWidth(
-                        tok.strValue.c_str(),
-                        BLOCK_STR_INPUT_MINW,
-                        BLOCK_STR_INPUT_MAXW);
-            }
-
-        case BlockTokenType::IntInput:
-            {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%d", tok.intValue);
-
-                return calcInputWidth(
-                        buf,
+    if (tok.type == BlockTokenType::Text) {
+        return ImGui::CalcTextSize(tok.text.c_str()).x;
+    } else if (tok.type == BlockTokenType::Input) {
+        if (tok.acceptedTypes & Value_String) {
+            return calcInputWidth(
+                    tok.defaultValue.c_str(),
+                    BLOCK_STR_INPUT_MINW,
+                    BLOCK_STR_INPUT_MAXW);
+        } else if (tok.acceptedTypes == Value_Int) {
+            return calcInputWidth(
+                        tok.defaultValue.c_str(),
                         BLOCK_INT_INPUT_MINW,
                         BLOCK_INT_INPUT_MAXW);
-            }
-
-        case BlockTokenType::FloatInput:
-            {
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%g", tok.floatValue);
-
-                return calcInputWidth(
-                        buf,
+        } else if (tok.acceptedTypes & Value_Number) {
+            return calcInputWidth(
+                        tok.defaultValue.c_str(),
                         BLOCK_FLOAT_INPUT_MINW,
                         BLOCK_FLOAT_INPUT_MAXW);
-            }
+        }
     }
 
     return 0.0f;
