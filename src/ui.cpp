@@ -145,6 +145,8 @@ float calcLiteralWidth(const char *text, ValueType type)
                 text,
                 BLOCK_FLOAT_INPUT_MINW,
                 BLOCK_FLOAT_INPUT_MAXW);
+    } else if (type == Value_Bool) {
+        return ImGui::GetFrameHeight(); // checkbox size
     }
 
     return 0.0f;
@@ -203,6 +205,18 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
                 tok.defaultValue = std::to_string(value);
             }
             ImGui::PopID();
+        } else if (tok.acceptedTypes == Value_Bool) {
+            ImGui::PushID(i);
+
+            bool value =
+                tok.defaultValue == "true" ||
+                tok.defaultValue == "1";
+
+            if (ImGui::Checkbox("##b", &value)) {
+                tok.defaultValue = value ? "true" : "false";
+            }
+
+            ImGui::PopID();
         }
         cursorPos.x += width + BLOCK_HSPACE;
     }
@@ -226,6 +240,14 @@ void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t input
         float value = literal.empty() ? 0 : std::stof(literal);
         if (ImGui::InputScalar( "##f", ImGuiDataType_Float, &value, nullptr, nullptr, "%g")) {
             literal = std::to_string(value);
+        }
+    } else if (type == Value_Bool) {
+        bool value =
+            literal == "true" ||
+            literal == "1";
+
+        if (ImGui::Checkbox("##b", &value)) {
+            literal = value ? "true" : "false";
         }
     }
 

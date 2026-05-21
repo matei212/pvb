@@ -172,8 +172,8 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
         { "{float:left=0.5} > {float:right=0.5}",  ">"  },
         { "{float:left=0.5} >= {float:right=0.5}", ">=" },
         { "{float:left=0.5} = {float:right=0.5}",  "==" },
-        { "{float:value=0} and {float:value=0}",   "&&" },
-        { "{float:value=0} or {float:value=0}",    "||" },
+        { "{bool:value=true} and {float:value=false}",   "&&" },
+        { "{bool:value=true} or {float:value=false}",    "||" },
     };
 
     for (auto &[pattern, op] : binOps) {
@@ -189,7 +189,7 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
         { "round {number:value=0.5}", "round" },
         { "abs {number:value=0.5}",  "abs"   },
         { "sqrt {number:value=0.5}", "sqrt"  },
-        { "not {float:value=0}",     "!"     },
+        { "not {float:value=true}",     "!"     },
     };
 
     for (auto &[pattern, op] : unaryOps) {
