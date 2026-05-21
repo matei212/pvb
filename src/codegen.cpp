@@ -59,7 +59,7 @@ uint32_t ASTBuilder::buildStatementChain(uint32_t startId, Canvas &canvas, ASTNo
         auto it = canvas.FindBlockById(current);
         if (it == canvas.GetBlocks().end()) {
             LOG_ERROR("dangling block id %s", std::to_string(current).c_str());
-            return -1;
+            return static_cast<uint32_t>(-1);
         }
 
         const BlockInstance &block = *it;
@@ -94,7 +94,7 @@ uint32_t ASTBuilder::buildIfBody(uint32_t startId, Canvas &canvas, ASTNode &ifNo
 
     if (cursor == 0) {
         LOG_ERROR("If block missing End If");
-        return -1;
+        return static_cast<uint32_t>(-1);
     }
 
     auto it  = canvas.FindBlockById(cursor);
@@ -108,7 +108,7 @@ uint32_t ASTBuilder::buildIfBody(uint32_t startId, Canvas &canvas, ASTNode &ifNo
 
         if (cursor == 0) {
             LOG_ERROR("If block missing End If after Else");
-            return -1;
+            return static_cast<uint32_t>(-1);
         }
 
         it  = canvas.FindBlockById(cursor);

@@ -186,12 +186,12 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
             ImGui::TextUnformatted(tok.text.c_str());
         } else if (tok.acceptedTypes & Value_String) {
             ImGui::SetNextItemWidth(width);
-            ImGui::PushID(i);
+            ImGui::PushID(static_cast<int>(i));
             ImGui::InputText("##s", &tok.defaultValue);
             ImGui::PopID();
         } else if (tok.acceptedTypes == Value_Int) {
             ImGui::SetNextItemWidth(width);
-            ImGui::PushID(i);
+            ImGui::PushID(static_cast<int>(i));
             int value = tok.defaultValue.empty() ? 0 : std::stoi(tok.defaultValue);
             if (ImGui::InputScalar("##i", ImGuiDataType_S32, &value, nullptr, nullptr)) {
                 tok.defaultValue = std::to_string(value);
@@ -199,14 +199,14 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
             ImGui::PopID();
         } else if (tok.acceptedTypes & Value_Number) {
             ImGui::SetNextItemWidth(width);
-            ImGui::PushID(i);
+            ImGui::PushID(static_cast<int>(i));
             float value = tok.defaultValue.empty() ? 0 : std::stof(tok.defaultValue);
             if (ImGui::InputScalar( "##f", ImGuiDataType_Float, &value, nullptr, nullptr, "%g")) {
                 tok.defaultValue = std::to_string(value);
             }
             ImGui::PopID();
         } else if (tok.acceptedTypes == Value_Bool) {
-            ImGui::PushID(i);
+            ImGui::PushID(static_cast<int>(i));
 
             bool value =
                 tok.defaultValue == "true" ||
@@ -732,11 +732,11 @@ void Canvas::DuplicateInstance(uint32_t id)
     auto original = FindBlockById(id);
     BlockInstance inst {
         .id         = m_NextId++,
-            .data       = original->data,
-            .pos        = ImVec2(original->pos.x + 40.0, original->pos.y + 40.0),
-            .size       = calcSidebarBlockSize(original->data),
-            .inputs     = buildDefaultInputs(original->data),
-    };
+	.data       = original->data,
+	.pos        = ImVec2(original->pos.x + 40.0f, original->pos.y + 40.0f),
+	.size       = calcSidebarBlockSize(original->data),
+	.inputs     = buildDefaultInputs(original->data),
+};
     m_Blocks.push_back(std::move(inst));
     LOG_DEBUG("duplicated instance id=%u at (%.0f, %.0f) with id=%u", id, inst.pos.x, inst.pos.y, inst.id);
 }
@@ -1088,7 +1088,7 @@ int32_t Canvas::FindIdxById(uint32_t id)
     int32_t idx = -1;
     for (size_t i = 0; i < m_Blocks.size(); i ++) {
         if (id == m_Blocks[i].id) {
-            idx = i;
+            idx = static_cast<int32_t>(i);
             break;
         }
     }
