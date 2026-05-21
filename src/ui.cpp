@@ -879,6 +879,18 @@ void Canvas::CollectBlockTree(uint32_t id, std::unordered_set<uint32_t>& visited
     }
 }
 
+std::optional<BlockInstance> Canvas::GetMainBlock()
+{
+    for (auto &block : m_Blocks) {
+        if (block.data.definition->type == BlockType::Event
+            && block.data.definition->nameFmt == "Main") {
+            return block;
+        }
+    }
+
+    return std::nullopt;
+}
+
 void Canvas::AppendBlockInputSockets(BlockInstance &block)
 {
     block.size = calcCanvasBlockSize(*this, block);
@@ -1034,6 +1046,20 @@ int32_t Canvas::FindIdxById(uint32_t id)
 
 
 // CodeView
+void CodeView::Generate(Canvas &canvas)
+{
+    auto main = canvas.GetMainBlock();
+    if (!main.has_value()) {
+        LOG_ERROR("no main block in program");
+        return;
+    }
+
+    ASTBuilder builder;
+    auto ast = builder.build(main.value(), canvas);
+    CodeGen generator;
+    m_Code = generator.emit(*ast);
+}
+
 void CodeView::Draw()
 {
     ImGui::BeginChild("CodeView", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
@@ -1257,7 +1283,10 @@ void UI::DrawMainMenuBar()
         }
 
         if (ImGui::BeginMenu("Build")) {
-            if (ImGui::MenuItem("Regenerate Code")) { }
+            if (ImGui::MenuItem("Regenerate Code")) {
+                m_CodeView.Generate(m_Canvas);
+                m_ShowCodeView = true;
+            }
             if (ImGui::MenuItem("Build")) {
                 m_ShowOutputPanel = true;
             }

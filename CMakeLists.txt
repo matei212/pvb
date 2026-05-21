@@ -69,6 +69,7 @@ add_executable(pvb
     src/ui.cpp
     src/app.cpp
     src/log.cpp
+    src/codegen.cpp
 )
 
 target_include_directories(pvb PRIVATE src)

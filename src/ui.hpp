@@ -216,6 +216,8 @@ class Canvas
 
         void CollectBlockTree(uint32_t id, std::unordered_set<uint32_t>& visited);
 
+        std::optional<BlockInstance> GetMainBlock();
+
         ImVec2 WorldToScreen(ImVec2 pos);
         ImVec2 ScreenToWorld(ImVec2 pos);
 
@@ -242,16 +244,19 @@ class Canvas
 void DrawCanvasBlock(Canvas &canvas, BlockInstance &Block, UIEventQueue &events);
 void UpdateCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events);
 
+#include "codegen.hpp"
+
 class CodeView
 {
     public:
         CodeView() = default;
         ~CodeView() = default;
 
+        void Generate(Canvas &canvas);
         void Draw();
 
     private:
-        std::string m_Code = "Hello, World!";
+        std::string m_Code;
 };
 
 class UI
@@ -302,8 +307,7 @@ inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Expression,  Value_Number, "{number:left=1} / {number:right=1}",    "Divies 2 numbers",                                        BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Number, "{int:left=1} mod {int:right=1}",        "Adds 2 numbers",                                          BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Float,  "round {number:value=0.5}",              "Rounds a number",                                         BlockCategory::Math        },
-    BlockDefinition { BlockType::Expression,  Value_Float,  "abs {number:value=0.5}",                "Absolute of a number",                                    BlockCategory::Math        },
-    BlockDefinition { BlockType::Expression,  Value_Float,  "sqrt {number:value=0.5}",               "Square root of a number",                                 BlockCategory::Math        },
+    BlockDefinition { BlockType::Expression,  Value_Float,  "abs {number:value=0.5}",                "Absolute of a number",                                    BlockCategory::Math        }, BlockDefinition { BlockType::Expression,  Value_Float,  "sqrt {number:value=0.5}",               "Square root of a number",                                 BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "true",                                  "true value",                                              BlockCategory::Logic       },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "false",                                 "false value",                                             BlockCategory::Logic       },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} < {float:right=0.5}",  "Checks if a number is less than another number",          BlockCategory::Logic       },
