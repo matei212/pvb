@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PVB – Documentație Infoeducație 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+  /* ── App colour palette (from style.hpp / screenshots) ── */
+  :root {
+    --bg-main:       #ffffff;
+    --bg-app:        #1e1e2e;
+    --bg-sidebar:    #16162a;
+    --bg-canvas:     #13131f;
+    --grid-line:     #2a2a3e;
+
+    --block-green:   #3dba5e;
+    --block-blue:    #3a7bd5;
+    --block-orange:  #e8a020;
+    --block-purple:  #8b5cf6;
+    --block-cyan:    #22d3ee;
+    --block-teal:    #14b8a6;
+    --block-pink:    #c43180;
+
+    --accent:        #3a7bd5;
+    --accent-2:      #8b5cf6;
+    --accent-3:      #3dba5e;
+
+    --text-dark:     #1a1a2e;
+    --text-muted:    #5a5a7a;
+    --text-light:    #e0e0f0;
+
+    --border:        #dde0f0;
+    --border-strong: #b0b8d8;
+    --card-bg:       #f8f8fc;
+    --code-bg:       #1e1e2e;
+
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { font-size: 10pt; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-main);
+    color: var(--text-dark);
+    line-height: 1.7;
+    font-weight: 400;
+  }
+
+  /* ── Print: A4 pages ── */
+  @media print {
+      html {
+          font-size: 15pt; /* previously 12.5pt */
+      }
+
+      body {
+          background: #fff;
+          line-height: 1.8;
+      }
+
+      /* Main text */
+      p,
+      li,
+      ul,
+      ol {
+          font-size: 12.5pt !important;
+      }
+
+      /* Headings */
+      .chapter-title {
+          font-size: 24pt !important;
+      }
+
+      .section-title {
+          font-size: 17pt !important;
+      }
+
+      /* Tables */
+      table {
+          font-size: 11pt !important;
+      }
+
+      table thead th {
+          font-size: 10pt !important;
+      }
+
+      /* Code blocks */
+      pre {
+          font-size: 10.5pt !important;
+          line-height: 1.75;
+      }
+
+      code {
+          font-size: 10pt !important;
+      }
+
+      /* Small UI labels */
+      .block-chip,
+      .category-label,
+      .section-badge,
+      .tech-pill,
+      .file-name,
+      .flow-label,
+      .cover-meta, {
+          font-size: 10pt !important;
+      }
+
+      .footer {
+          font-size: 7.5pt !important;
+      }
+
+      /* Cover page */
+      .cover-title {
+          font-size: 58pt !important;
+      }
+
+      .cover-subtitle {
+          font-size: 16pt !important;
+      }
+
+      .page-break {
+          page-break-before: always;
+      }
+
+      .no-break {
+          page-break-inside: avoid;
+      }
+
+      a {
+          color: inherit;
+          text-decoration: none;
+      }
+
+      .cover-accent,
+      .block-chip,
+      .category-label,
+      .section-badge,
+      .tech-pill,
+      code,
+      pre,
+      table thead,
+      .comparison-winner {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+      }
+
+      .print-top-margin {
+          margin-top: 30mm !important;
+      }
+  }
+
+  @page { size: A4; margin: 10mm; }
+
+  /* ── Layout wrapper ── */
+  .doc { max-width: 180mm; margin: 0 auto; padding: 0 0 20mm; }
+
+  /* ═══════════════════════════════════════════
+     COVER PAGE
+  ═══════════════════════════════════════════ */
+  .cover {
+    min-height: 260mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    padding: 20mm 0 10mm;
+  }
+
+  .cover-accent {
+    position: absolute;
+    top: 0; left: -18mm; right: -18mm;
+    height: 8px;
+    background: linear-gradient(90deg, var(--block-green) 0%, var(--block-blue) 33%, var(--block-purple) 66%, var(--block-orange) 100%);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-app);
+    color: var(--text-light);
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cover-badge .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--block-green);
+    display: inline-block;
+  }
+
+  .cover-title {
+    font-size: 48pt;
+    font-weight: 700;
+    letter-spacing: -2px;
+    line-height: 1;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+  }
+
+  .cover-title span { color: var(--accent); }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    max-width: 120mm;
+    line-height: 1.5;
+  }
+
+  .cover-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 9pt;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .cover-meta a { color: var(--accent); }
+
+  .cover-blocks-preview {
+    margin: 30px 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* ── Mini block chips (cover decoration) ── */
+  .block-chip {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: #fff;
+    display: inline-block;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .chip-green  { background: var(--block-green); }
+  .chip-blue   { background: var(--block-blue); }
+  .chip-orange { background: var(--block-orange); }
+  .chip-purple { background: var(--block-purple); }
+  .chip-cyan   { background: var(--block-cyan); color: #0f172a; }
+
+  /* ═══════════════════════════════════════════
+     SECTION HEADERS
+  ═══════════════════════════════════════════ */
+  .chapter {
+    margin-top: 12mm;
+    margin-bottom: 6mm;
+    border-bottom: 2px solid var(--text-dark);
+    padding-bottom: 4px;
+  }
+
+  .chapter-label {
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 3px;
+  }
+
+  .chapter-title {
+    font-size: 18pt;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+  }
+
+  .section {
+    margin-top: 8mm;
+    margin-bottom: 3mm;
+  }
+
+  .section-badge {
+    display: inline-block;
+    background: var(--bg-app);
+    color: var(--text-light);
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .section-title {
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: -0.3px;
+  }
+
+  /* ═══════════════════════════════════════════
+     BODY TEXT
+  ═══════════════════════════════════════════ */
+  p { margin-bottom: 8px; font-size: 10pt; }
+
+  strong { font-weight: 600; }
+
+  a { color: var(--accent); }
+
+  ul, ol {
+    margin: 6px 0 10px 18px;
+    font-size: 10pt;
+  }
+
+  li { margin-bottom: 3px; }
+
+  /* ═══════════════════════════════════════════
+     CARDS
+  ═══════════════════════════════════════════ */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 10px 0;
+  }
+
+  .card-title {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  /* ═══════════════════════════════════════════
+     COMPARISON TABLE
+  ═══════════════════════════════════════════ */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin: 10px 0;
+  }
+
+  table thead tr {
+    background: var(--bg-app);
+    color: var(--text-light);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  table thead th {
+    padding: 7px 10px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    font-weight: 600;
+  }
+
+  table thead th:first-child { border-radius: 6px 0 0 0; }
+  table thead th:last-child  { border-radius: 0 6px 0 0; }
+
+  table tbody tr:nth-child(even) { background: var(--card-bg); }
+  table tbody tr:nth-child(odd)  { background: #fff; }
+
+  table tbody td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .check { color: var(--block-green); font-weight: 700; }
+  .cross { color: #e53e3e; font-weight: 700; }
+
+  .comparison-winner td {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .comparison-winner td:first-child {
+    border-left: 3px solid var(--accent);
+    padding-left: 8px;
+  }
+
+  /* ═══════════════════════════════════════════
+     CODE BLOCKS
+  ═══════════════════════════════════════════ */
+  pre {
+    background: var(--code-bg);
+    color: #cdd6f4;
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 10px 0;
+    line-height: 1.6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  pre .c-kw  { color: #cba6f7; }  /* keyword */
+  pre .c-ty  { color: #89b4fa; }  /* type */
+  pre .c-fn  { color: #a6e3a1; }  /* function */
+  pre .c-st  { color: #fab387; }  /* string */
+  pre .c-cm  { color: #6c7086; font-style: italic; } /* comment */
+  pre .c-nm  { color: #fab387; }  /* number */
+  pre .c-op  { color: #89dceb; }  /* operator */
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 8.5pt;
+    background: #eef0fa;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  /* ═══════════════════════════════════════════
+     TECHNOLOGY PILLS
+  ═══════════════════════════════════════════ */
+  .tech-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+  }
+
+  .tech-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .tech-pill .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ═══════════════════════════════════════════
+     ARCHITECTURE FILE LIST
+  ═══════════════════════════════════════════ */
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+    font-size: 9pt;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .file-item:last-child { border-bottom: none; }
+  .file-item:nth-child(odd) { background: var(--card-bg); }
+
+  .file-name {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 60mm;
+    flex-shrink: 0;
+  }
+
+  .file-desc { color: var(--text-dark); line-height: 1.4; }
+
+  /* ═══════════════════════════════════════════
+     AST DIAGRAM
+  ═══════════════════════════════════════════ */
+  .ast-diagram {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 10px 0;
+    color: #cdd6f4;
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    line-height: 1.8;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ast-node { color: #cba6f7; }
+  .ast-val  { color: #a6e3a1; }
+  .ast-arrow{ color: #6c7086; }
+
+  /* ═══════════════════════════════════════════
+     BLOCK DEMOS
+  ═══════════════════════════════════════════ */
+  .block-demo {
+    background: var(--bg-app);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 10px 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .block-demo-label {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    color: #6c7086;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+
+  .block-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .block-indent {
+    margin-left: 20px;
+  }
+
+  .b {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 4px;
+    color: #fff;
+    display: inline-block;
+  }
+
+  .b-green  { background: var(--block-green); }
+  .b-blue   { background: var(--block-blue); }
+  .b-orange { background: var(--block-orange); }
+  .b-purple { background: var(--block-purple); }
+  .b-cyan   { background: var(--block-cyan); color: #0f172a; }
+
+  .b-input {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 3px;
+    padding: 2px 7px;
+   efont-family: var(--font-mono);
+    font-size: 8pt;
+    color: #e0e0f0;
+    display: inline-block;
+  }
+
+  /* ═══════════════════════════════════════════
+     SCREENSHOT PLACEHOLDERS
+  ═══════════════════════════════════════════ */
+  .screenshot-slot {
+    border: 2px dashed var(--border-strong);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 12px 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 8pt;
+  }
+
+  .screenshot-slot .slot-label {
+    font-size: 9pt;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent);
+  }
+
+  /* Screenshot images */
+  .screenshot-img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: block;
+    margin: 12px 0;
+  }
+
+  /* ═══════════════════════════════════════════
+     CALLOUT BOXES
+  ═══════════════════════════════════════════ */
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: #eef4ff;
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    font-size: 9.5pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .callout.green { border-color: var(--block-green); background: #edfbf1; }
+  .callout.orange { border-color: var(--block-orange); background: #fff8ed; }
+  .callout.purple { border-color: var(--block-purple); background: #f5f0ff; }
+
+  /* ═══════════════════════════════════════════
+     CATEGORY LABELS (sidebar sections)
+  ═══════════════════════════════════════════ */
+  .category-label {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-right: 8px;
+    margin-bottom: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .cat-green  { background: var(--block-green);  color: #fff; }
+  .cat-blue   { background: var(--block-blue);   color: #fff; }
+  .cat-orange { background: var(--block-orange); color: #fff; }
+  .cat-purple { background: var(--block-purple); color: #fff; }
+  .cat-cyan   { background: var(--block-cyan);   color: #fff; }
+  .cat-pink   { background: var(--block-pink);   color: #fff; }
+
+  /* ═══════════════════════════════════════════
+     ROADMAP
+  ═══════════════════════════════════════════ */
+  .roadmap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 10px 0;
+  }
+
+  .roadmap-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 9.5pt;
+  }
+
+  .roadmap-item:last-child { border-bottom: none; }
+
+  .roadmap-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rd-done    { background: var(--block-green); }
+  .rd-planned { background: var(--block-orange); border: 2px solid var(--block-orange); }
+  .rd-future  { background: transparent; border: 2px solid var(--border-strong); }
+
+  /* ═══════════════════════════════════════════
+     COMMIT STYLE
+  ═══════════════════════════════════════════ */
+  .commit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+    font-size: 9pt;
+    font-family: var(--font-mono);
+  }
+
+  .commit-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .commit-tag {
+    font-size: 7.5pt;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ct-feat    { background: #dcfce7; color: #166534; }
+  .ct-refact  { background: #dbeafe; color: #1e40af; }
+  .ct-chore   { background: #f3f4f6; color: #374151; }
+
+  /* ═══════════════════════════════════════════
+     FOOTER
+  ═══════════════════════════════════════════ */
+  .footer {
+    margin-top: 14mm;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 7.5pt;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .footer-blocks {
+    display: flex;
+    gap: 3px;
+  }
+
+  .fb {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ═══════════════════════════════════════════
+     DIVIDERS
+  ═══════════════════════════════════════════ */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+  }
+
+  /* ═══════════════════════════════════════════
+     FLOW DIAGRAM (blocks → AST → code)
+  ═══════════════════════════════════════════ */
+  .flow-diagram {
+    display: flex;
+    gap: 0;
+    align-items: flex-start;
+    margin: 12px 0;
+    font-size: 8.5pt;
+  }
+
+  .flow-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    margin-top: 30px;
+    color: var(--text-muted);
+    font-size: 16pt;
+    flex-shrink: 0;
+  }
+
+  .flow-label {
+    font-family: var(--font-mono);
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+
+  .flow-box {
+    background: var(--code-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #cdd6f4;
+    font-family: var(--font-mono);
+    font-size: 7.5pt;
+    line-height: 1.7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ═══════════════════════════════════════════
+     TESTIMONIAL
+  ═══════════════════════════════════════════ */
+  .testimonial {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--block-purple);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 9.5pt;
+    font-style: italic;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .testimonial-author {
+    margin-top: 6px;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 8.5pt;
+    color: var(--text-muted);
+  }
+
+</style>
+</head>
+<body>
+<div class="doc">
+
+<!-- ══════════════════════════════════════════
+     COVER
+══════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-accent"></div>
+
+  <div class="cover-badge">
+    <span class="dot"></span>
+    Infoeducație 2026 &nbsp;·&nbsp; Secțiunea Software Utilitar
+  </div>
+
+  <div class="cover-title">PVB<span>.</span></div>
+  <div class="cover-subtitle">
+    Programare Vizuală prin Blocuri — aplicație nativă de programare vizuală cu generare automată de cod C++
+  </div>
+
+  <div class="cover-blocks-preview">
+    <span class="block-chip chip-green">Main</span>
+    <span class="block-chip chip-blue">Write "Hello World"</span>
+    <span class="block-chip chip-blue">Read into</span>
+    <span class="block-chip chip-orange">If &nbsp; then</span>
+    <span class="block-chip chip-purple">1 + 1</span>
+    <span class="block-chip chip-cyan">true</span>
+  </div>
+
+  <div class="cover-meta">
+    <div>Autor: <strong>Costan Matei - Ștefan</strong></div>
+    <div>Liceu: <strong>Colegiul Național "I. L. Caragiale" - București</strong></div>
+    <div>Prof. Coordonator: <strong>Florea Andrei</strong></div>
+    <div>GitHub: <a href="https://github.com/matei212/pvb">github.com/matei212/pvb</a></div>
+    <div>Limbaj: C++20 &nbsp;·&nbsp; UI: Dear ImGui &nbsp;·&nbsp; Build: CMake</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TABLE OF CONTENTS
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="chapter">
+  <div class="chapter-label">Cuprins</div>
+  <div class="chapter-title">Structura documentației</div>
+</div>
+
+<div style="font-size:9.5pt; line-height:2;">
+  <div><strong>I. Alegerea tematicii</strong></div>
+  <div style="margin-left:16px; color:var(--text-muted)">
+      <ul>
+          <li>I.1 Analiza pieței</li>
+          <li>I.2 Planificarea dezvoltării</li>
+      </ul>
+  </div>
+  <div style="margin-top:6px"><strong>II. Implementarea aplicației</strong></div>
+  <div style="margin-left:16px; color:var(--text-muted)">
+      <ul>
+          <li>II.1 Proiectarea arhitecturală / Tehnologii</li>
+          <li>II.2 Arhitectura</li>
+          <li>II.3 Stabilitate</li>
+          <li>II.4 Securitate</li>
+          <li>II.5 Testare</li>
+          <li>II.6 Maturitate</li>
+          <li>II.7 Versionare</li>
+      </ul>
+  </div>
+  <div style="margin-top:6px"><strong>III. Interfața</strong></div>
+  <div style="margin-left:16px; color:var(--text-muted)">
+      <ul>
+          <li>III.1 Interfața</li>
+          <li>III.2 Experiența utilizatorului</li>
+      </ul>
+  </div>
+  <div style="margin-top:6px"><strong>IV. Resurse externe</strong></div>
+  <div style="margin-top:6px"><strong>V. Concluzie</strong></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHAPTER I
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="chapter">
+  <div class="chapter-label">Capitolul I</div>
+  <div class="chapter-title">Alegerea tematicii</div>
+</div>
+
+<!-- I.1 -->
+<div class="section">
+  <div class="section-badge">I.1</div>
+  <div class="section-title">Analiza pieței</div>
+</div>
+
+<p>Programarea vizuală prin blocuri a câștigat o popularitate semnificativă în educație, datorită accesibilității sale față de sintaxa tradițională. Cele mai cunoscute soluții existente sunt <strong>Scratch</strong> (MIT Media Lab) și <strong>Blockly</strong> (Google). Ambele sunt instrumente valoroase, însă vin cu o limitare fundamentală: <strong>nu oferă nicio legătură directă între blocurile vizuale și codul scris</strong>, ceea ce face tranziția spre un limbaj de programare real dificilă și abruptă.</p>
+
+<p>PVB (<em>Programare Vizuală prin Blocuri</em>) a apărut tocmai din această nevoie: un instrument care funcționează ca o punte între gândirea vizuală și sintaxa C++, permițând utilizatorului să vadă în timp real echivalentul textual al construcțiilor sale vizuale.</p>
+
+<div class="no-break">
+<table>
+  <thead>
+    <tr>
+      <th>Caracteristică</th>
+      <th>Scratch</th>
+      <th>Blockly</th>
+      <th>PVB</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Programare prin blocuri</td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Compilare și rulare integrată</td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Generare cod real (C++)</td>
+      <td class="cross">✗</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Source map (blok ↔ linie cod)</td>
+      <td class="cross">✗</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Funcționare offline / nativă</td>
+      <td class="cross">✗</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Performanță</td>
+      <td class="cross">✗</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td>Acces la internet necesar</td>
+      <td class="check" style="color:#e53e3e">✓</td>
+      <td class="check" style="color:#e53e3e">✓</td>
+      <td class="cross" style="color:var(--block-green)">✗</td>
+    </tr>
+    <tr class="comparison-winner">
+      <td>Dimensiune aplicație</td>
+      <td>~web</td>
+      <td>~web</td>
+      <td><strong>9 MB</strong></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout green">
+  <strong>Avantajul cheie al PVB:</strong> Funcția <em>Generate Code</em> convertește în timp real blocurile vizuale în cod C++ valid, compilabil, cu o legătură biunivocă (source map) între fiecare bloc și linia sa de cod aferentă. Aceasta permite profesorilor să creeze o asociere concretă între schema vizuală și sintaxa C++, dar și oricărui doritor să înceapă programarea fără bariera sintaxei.
+</div>
+
+<div class="page-break"></div>
+<p>Spre deosebire de Scratch și Blockly — soluții web care necesită browser și conexiune la internet — PVB este o <strong>aplicație nativă, complet offline</strong>, cu o amprentă de doar 9 MB. Aceasta o face ideală pentru utilizare în laboratoare școlare sau pe echipamente fără acces la internet.</p>
+
+<p><strong>Publicul țintă</strong> include profesori de informatică care predau C++ și doresc o metodă vizuală de introducere a conceptelor, dar și elevi și studenți aflați la primii pași în programare.</p>
+
+<br>
+<!-- I.2 -->
+<div class="section">
+  <div class="section-badge">I.2</div>
+  <div class="section-title">Planificarea dezvoltării</div>
+</div>
+
+<p>Dezvoltarea PVB a parcurs mai multe etape iterative înainte de a ajunge la forma actuală. Procesul a demarat cu o cercetare a posibilităților tehnice și s-a materializat printr-o serie de prototipuri:</p>
+
+<ul>
+  <li><strong>Prototip 1 — Parser în C:</strong> Am implementat un parser care convertea un AST (Abstract Syntax Tree) direct în cod C++. Aceasta a validat ideea de bază, dar limbajul C limita flexibilitatea structurilor de date necesare.</li>
+  <li><strong>Prototip 2 — Renderer 2D custom în OpenGL:</strong> Am explorat posibilitatea unui motor grafic 2D propriu, scris manual. Deși funcțional, acesta ar fi necesitat un efort de implementare disproporționat față de valoarea adăugată.</li>
+  <li><strong>Decizia finală:</strong> Am ales <strong>C++</strong> pentru flexibilitatea și performanța pe care le oferă față de C, și <strong>Dear ImGui</strong> ca framework UI pentru scalabilitate, ușurința de integrare și ecosistemul open-source. Această combinație a permis un ciclu de dezvoltare rapid, menținând în același timp performanța nativă.</li>
+</ul>
+
+<!-- ══════════════════════════════════════════
+     CHAPTER II
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="chapter">
+  <div class="chapter-label">Capitolul II</div>
+  <div class="chapter-title">Implementarea aplicației</div>
+</div>
+
+<!-- II.1 Technologies -->
+<div class="section">
+  <div class="section-badge">II.1</div>
+  <div class="section-title">Proiectarea arhitecturală și tehnologiile folosite</div>
+</div>
+
+<p>Alegerea tehnologiilor a pornit de la trei priorități: <strong>performanță nativă</strong>, <strong>amprentă minimă</strong> și <strong>extensibilitate</strong>. Fiecare componentă a stack-ului tehnic a fost aleasă deliberat:</p>
+
+<div class="tech-grid">
+  <div class="tech-pill">
+    <span class="dot" style="background:var(--block-blue)"></span>
+    C++20
+  </div>
+  <div class="tech-pill">
+    <span class="dot" style="background:var(--block-purple)"></span>
+    Dear ImGui
+  </div>
+  <div class="tech-pill">
+    <span class="dot" style="background:var(--block-green)"></span>
+    OpenGL (backend)
+  </div>
+  <div class="tech-pill">
+    <span class="dot" style="background:var(--block-orange)"></span>
+    CMake
+  </div>
+  <div class="tech-pill">
+    <span class="dot" style="background:var(--block-cyan)"></span>
+    ImGuiColorTextEdit
+  </div>
+</div>
+
+<p><strong>C++</strong> a fost ales pentru performanță și control complet asupra memoriei — esențial pentru o aplicație nativă care manipulează structuri de date complexe (grafuri de blocuri, AST-uri). Compilat cu standardul C++20, proiectul beneficiază de funcționalități moderne ale limbajului.</p>
+
+<p><strong>Dear ImGui</strong> este o bibliotecă UI <em>immediate-mode</em>, lightweight și open-source, ideală pentru aplicații de tip tool. Aceasta gestionează randarea interfeței, dar <strong>logica blocurilor — drag, snap, conexiuni, expresii — a fost implementată integral de la zero</strong>, ImGui servind exclusiv ca layer de randare. Randarea este accelerată hardware prin backend-ul de <strong>OpenGL</strong>, ceea ce asigură fluiditate chiar și cu zeci de blocuri pe canvas.</p>
+
+<p><strong>ImGuiColorTextEdit</strong> este utilizat pentru panoul de vizualizare a codului generat, cu colorare sintactică C++. Am extins biblioteca cu un <em>patch custom</em> care permite evidențierea unei întregi linii de cod — funcționalitate necesară pentru implementarea <em>source map</em>-ului (legătura vizuală bloc ↔ linie).</p>
+
+<p><strong>CMake</strong> gestionează sistemul de build cross-platform, permițând compilarea pe Linux și Windows fără modificări ale codului sursă. Toate dependențele sunt open-source și incluse în proiect.</p>
+
+<div class="callout purple">
+  <strong>Paradigme de programare:</strong> Proiectul folosește <em>OOP</em> pentru modelarea blocurilor și a componentelor UI, <em>programare funcțională prin callbacks</em> pentru gestionarea evenimentelor, și o <em>coadă de evenimente</em> (event queue) pentru decuplarea logicii de la ciclul de randare.
+</div>
+
+<!-- II.2 Architecture -->
+<div class="page-break"></div>
+<div class="section">
+  <div class="section-badge">II.2</div>
+  <div class="section-title">Arhitectura aplicației</div>
+</div>
+
+<p>Aplicația adoptă o <strong>arhitectură minimală și modulară</strong>, cu doar <strong>13 fișiere sursă</strong>. Fiecare modul are o responsabilitate clară, facilitând înțelegerea și extinderea codului:</p>
+
+<div class="file-list no-break">
+  <div class="file-item">
+    <div class="file-name">ui.cpp / ui.hpp</div>
+    <div class="file-desc">Implementarea completă a interfeței grafice și a logicii blocurilor: randare, drag &amp; drop, conexiuni, meniuri contextuale.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">codegen.cpp / codegen.hpp</div>
+    <div class="file-desc">Generatorul de cod C++; parcurge AST-ul blocurilor și produce cod sursă valid.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">sourcemap.cpp / sourcemap.hpp</div>
+    <div class="file-desc">Realizează corespondeța biunivocă între fiecare bloc de pe canvas și liniile de cod generate.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">build.cpp / build.hpp</div>
+    <div class="file-desc">Compilează codul generat cu ajutorul compilatorului ales și execută programul rezultat, capturând output-ul.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">app.cpp / app.hpp</div>
+    <div class="file-desc">Pornește aplicația: inițializare OpenGL/ImGui, loop principal, cleanup.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">log.cpp / log.hpp</div>
+    <div class="file-desc">Logger utilizat în toate modulele pentru debugging și informații de stare.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">style.hpp</div>
+    <div class="file-desc">Constante globale de stil: culori, dimensiuni, fonturi — singurul loc unde se modifică aspectul vizual.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">main.cpp</div>
+    <div class="file-desc">Punctul de intrare al aplicației; inițializează și randează frame-ul principal.</div>
+  </div>
+</div>
+
+<!-- Flow diagram: blocks → AST → C++ -->
+<div class="section" style="margin-top:6mm;">
+  <div class="section-title" style="font-size:11pt;">Conversia blocuri → AST → C++</div>
+</div>
+
+<p>Generarea codului se realizează în două etape: blocurile de pe canvas sunt mai întâi structurate într-un <strong>AST (Abstract Syntax Tree)</strong>, care este apoi traversat de <code>codegen</code> pentru a produce codul C++. Această separare aduce un avantaj esențial: <strong>adăugarea unui nou limbaj țintă</strong> (ex. Python) necesită doar un nou modul codegen, fără a modifica logica blocurilor.</p>
+
+<div class="flow-diagram no-break">
+  <!-- Col 1: blocks -->
+  <div class="flow-col">
+    <div class="flow-label">Blocuri (canvas)</div>
+    <div class="flow-box">
+      <span style="color:var(--block-green)">Main</span><br>
+      &nbsp;&nbsp;<span style="color:var(--block-blue)">Write</span> <span style="color:#fab387">"Hello"</span><br>
+      &nbsp;&nbsp;<span style="color:var(--block-blue)">Read into</span> <span style="color:#a6e3a1">x</span><br>
+      &nbsp;&nbsp;<span style="color:var(--block-orange)">If</span> <span style="color:var(--block-purple)">x &gt; 0</span> <span style="color:var(--block-orange)">then</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--block-blue)">Write</span> <span style="color:#fab387">"pozitiv"</span><br>
+      &nbsp;&nbsp;<span style="color:var(--block-orange)">End If</span>
+    </div>
+  </div>
+
+  <div class="flow-arrow">→</div>
+
+  <!-- Col 2: AST -->
+  <div class="flow-col">
+    <div class="flow-label">AST</div>
+    <div class="flow-box">
+      <span class="ast-node">Program</span><br>
+      &nbsp;└─ <span class="ast-node">FuncDecl</span> <span class="ast-val">main</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="ast-node">Cout</span> <span class="ast-val">"Hello"</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;├─ <span class="ast-node">Cin</span> <span class="ast-val">x</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;└─ <span class="ast-node">IfStmt</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ cond: <span class="ast-node">BinOp</span> &gt;<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ body: <span class="ast-node">Cout</span> <span class="ast-val">"pozitiv"</span>
+    </div>
+  </div>
+
+  <div class="flow-arrow">→</div>
+
+  <!-- Col 3: C++ code -->
+  <div class="flow-col">
+    <div class="flow-label">Cod C++ generat</div>
+    <div class="flow-box">
+<span class="c-kw">#include</span> <span class="c-st">&lt;iostream&gt;</span><br>
+<span class="c-kw">using namespace</span> <span class="c-ty">std</span>;<br>
+<br>
+<span class="c-ty">int</span> <span class="c-fn">main</span>() {<br>
+&nbsp;&nbsp;cout &lt;&lt; <span class="c-st">"Hello"</span>;<br>
+&nbsp;&nbsp;<span class="c-ty">int</span> x = <span class="c-nm">0</span>;<br>
+&nbsp;&nbsp;cin &gt;&gt; x;<br>
+&nbsp;&nbsp;<span class="c-kw">if</span> (x &gt; <span class="c-nm">0</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cout &lt;&lt; <span class="c-st">"pozitiv"</span>;<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;<span class="c-kw">return</span> <span class="c-nm">0</span>;<br>
+}
+    </div>
+  </div>
+</div>
+
+<!-- II.3 Stability -->
+<div class="page-break"></div>
+
+<div class="section">
+  <div class="section-badge">II.3</div>
+  <div class="section-title">Stabilitatea aplicației</div>
+</div>
+
+<p>Unul dintre punctele forte ale PVB este <strong>amprenta extrem de redusă</strong>: binarul complet compilat ocupă <strong>doar 9 MB</strong>, incluzând toate resursele. Aceasta este posibilă datorită alegerii Dear ImGui — o bibliotecă minimalistă care nu aduce dependențe externe grele — și a backend-ului OpenGL, care delegă randarea direct GPU-ului.</p>
+
+<ul>
+  <li><strong>Accelerare hardware:</strong> Randarea canvasului și a blocurilor se face prin OpenGL, elimnând supraîncărcarea CPU pentru operații grafice.</li>
+  <li><strong>Gestionarea memoriei:</strong> Blocurile și structurile AST sunt administrate manual, evitând alocările repetate în loop-ul principal. Nu există memory leaks identificate în testarea pe Linux (valgrind) și Windows.</li>
+  <li><strong>Consum redus de resurse:</strong> Aplicația rulează eficient chiar și pe hardware modest, fără a afecta negativ sistemul în nicio situație de utilizare normală.</li>
+</ul>
+
+<!-- II.4 Security -->
+<div class="section">
+  <div class="section-badge">II.4</div>
+  <div class="section-title">Securitatea aplicației</div>
+</div>
+
+<p>PVB este o aplicație de desktop offline, fără comunicare în rețea, ceea ce elimină o întreagă categorie de vulnerabilități. Securitatea este asigurată prin mai multe mecanisme:</p>
+
+<p><strong>Logger centralizat (<code>log.cpp</code>):</strong> Un sistem de logging a fost utilizat pe parcursul întregii dezvoltări pentru a trasa comportamentul aplicației în toate modulele. Acesta facilitează identificarea rapidă a erorilor și oferă trasabilitate completă în sesiunile de debugging.</p>
+
+<p><strong>Build Output și Run Output:</strong> Panoul de output din aplicație (Build Log și Run Log) informează utilizatorul în timp real despre rezultatul compilării și execuției. Erorile de compilare returnate de compilator sunt capturate și afișate lizibil, permițând utilizatorului să înțeleagă ce a mers greșit fără acces la terminal.</p>
+
+<p><strong>Validarea intrărilor:</strong> Câmpurile editabile din blocuri (ex. valori numerice, nume de variabile) sunt validate în cadrul interfeței pentru a preveni generarea de cod invalid sau scenarii neprevăzute în codegen.</p>
+
+<!-- II.5 Testing -->
+<div class="page-break"></div>
+<div class="section">
+  <div class="section-badge">II.5</div>
+  <div class="section-title">Testarea produsului</div>
+</div>
+
+<p>Proiectul a fost testat pe <strong>două platforme majore: Linux și Windows</strong>, asigurând portabilitate completă fără modificări de cod. Sistemul de build CMake permite compilarea cross-platform din aceeași bază de cod.</p>
+
+<ul>
+  <li><strong>Testare funcțională manuală:</strong> Fiecare tip de bloc a fost testat individual și în combinații complexe, verificând corectitudinea codului C++ generat.</li>
+  <li><strong>Testare non-funcțională:</strong> Performanța și stabilitatea au fost evaluate pe scenarii cu număr mare de blocuri. Aplicația nu depinde de internet sau baze de date externe, eliminând o clasă întreagă de posibile defecțiuni.</li>
+  <li><strong>Portabilitate:</strong> Testat și verificat funcțional pe distribuții Linux (Ubuntu, Arch) și Windows 10/11.</li>
+</ul>
+
+<!-- II.6 Maturity -->
+<div class="section">
+  <div class="section-badge">II.6</div>
+  <div class="section-title">Maturitatea aplicației</div>
+</div>
+
+<p>PVB este o aplicație nouă, aflată în stadiu activ de dezvoltare. Cu toate că baza de utilizatori este momentan limitată la cercul de beta-testeri, feedback-ul primit a validat conceptul central: asocierea vizuală dintre blocuri și codul C++ generat este <strong>intuitivă și reduce semnificativ curba de învățare</strong> față de scrierea directă a codului.</p>
+
+<div class="testimonial">
+  „Am înțeles mult mai ușor cum funcționează un <em>if</em> în C++ când am văzut că blocul <em>If-then</em> generează exact acel cod. Era clar vizual ce face fiecare piesă."
+  <div class="testimonial-author">— Sora mea, Elev clasa a VI-a, beta-tester</div>
+</div>
+
+<div class="testimonial">
+  „Asocierea dintre blocuri vizuale și secvențe c++ oferă o metodă ușoară de înțelegere a algoritmilor elementari pentru începătorii în acest domeniu"
+  <div class="testimonial-author">— Elev clasa a IX-a, beta-tester</div>
+</div>
+
+<div class="testimonial">
+  „Ar fi util să am asta la clasă când introduc variabilele și structurile de control. Elevii pot experimenta vizual și vedea imediat codul echivalent."
+  <div class="testimonial-author">— Profesor de informatică, beta-tester</div>
+</div>
+
+<div class="page-break"></div>
+<p><strong>Roadmap — funcționalități planificate:</strong></p>
+
+<div class="roadmap no-break">
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-done"></div>
+    <div><strong>Blocuri de bază</strong> — Events, Console, Control Flow, Math, Logic, Variables</div>
+  </div>
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-done"></div>
+    <div><strong>Generare cod C++</strong> cu source map și compilare integrată</div>
+  </div>
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-planned"></div>
+    <div><strong>Structuri repetitive</strong> — blocuri <em>While</em> și <em>For</em></div>
+  </div>
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-planned"></div>
+    <div><strong>Blocuri custom (subprograme)</strong> — utilizatorul poate defini funcții proprii ca blocuri reutilizabile</div>
+  </div>
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-planned"></div>
+    <div><strong>Salvare și încărcare proiect</strong> — persistența sesiunilor de lucru</div>
+  </div>
+  <div class="roadmap-item">
+    <div class="roadmap-dot rd-future"></div>
+    <div><strong>Suport Python</strong> — al doilea limbaj țintă, facilitat de arhitectura AST separată</div>
+  </div>
+</div>
+
+<!-- II.7 Versioning -->
+<div class="section print-top-margin">
+  <div class="section-badge">II.7</div>
+  <div class="section-title">Folosirea sistemului de versionare</div>
+</div>
+
+<p>Proiectul folosește <strong>Git</strong> cu repository public pe GitHub. Istoricul commit-urilor este structurat după o convenție de denumire clară, inspirată din <em>Conventional Commits</em>:</p>
+
+<div class="commit-list no-break">
+  <div class="commit-item">
+    <span class="commit-tag ct-feat">feat</span>
+    <span>commit care adaugă o funcționalitate nouă (ex. <em>feat: add source map highlighting</em>)</span>
+  </div>
+  <div class="commit-item">
+    <span class="commit-tag ct-refact">refactor</span>
+    <span>restructurare a codului existent fără a schimba comportamentul (ex. <em>refactor: extract codegen module</em>)</span>
+  </div>
+  <div class="commit-item">
+    <span class="commit-tag ct-chore">chore</span>
+    <span>formatare, adăugare dependențe sau configurare build (ex. <em>chore: add CMakeLists for Windows</em>)</span>
+  </div>
+</div>
+
+<p>Această structură permite urmărirea clară a evoluției proiectului și identificarea rapidă a commit-ului care a introdus o anumită funcționalitate sau modificare. Stările intermediare ale proiectului sunt accesibile prin istoricul Git, facilitând revenirea la orice versiune anterioară.</p>
+
+<!-- ══════════════════════════════════════════
+     CHAPTER III
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="chapter">
+  <div class="chapter-label">Capitolul III</div>
+  <div class="chapter-title">Interfața</div>
+</div>
+
+<!-- III.1 -->
+<div class="section">
+  <div class="section-badge">III.1</div>
+  <div class="section-title">Interfața grafică</div>
+</div>
+
+<p>Interfața PVB a fost concepută pentru <strong>claritate și eficiență</strong>, punând utilizatorul în contact direct cu blocurile fără elemente decorative inutile. Un aspect esențial: <strong>logica și randarea blocurilor au fost implementate integral de la zero</strong>, folosind ImGui exclusiv ca strat de randare. Nu există nicio bibliotecă de third-party pentru logica de drag &amp; drop, conexiuni sau expresii.</p>
+
+<p>Aplicația se structurează în două zone principale, vizibile simultan:</p>
+
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/ui.png">
+    <div>Interfață PVB</div>
+</div>
+
+<p>Interfața respectă principii clasice de UI: consistență vizuală (fiecare categorie de blocuri are o culoare distinctivă menținută peste tot), feedback imediat (blocurile se conectează vizibil), și densitate informațională controlată (panoul de cod și output sunt opționale și pot fi ascunse).</p>
+
+<!-- III.2 -->
+<div class="page-break"></div>
+<div class="section">
+  <div class="section-badge">III.2</div>
+  <div class="section-title">Experiența utilizatorului</div>
+</div>
+
+<p>Fiecare componentă a interfeței a fost gândită pentru a minimiza fricțiunea și a maximiza viteza de lucru:</p>
+
+<div class="divider"></div>
+
+<p><strong style="font-size:10.5pt;">Meniul superior (Top Bar)</strong></p>
+<p>Meniul de sus oferă acces rapid la toate acțiunile principale:</p>
+<ul>
+    <li><strong>View</strong> — toggle pentru sidebar, panoul de cod (CodeView) și panoul de output; utilizatorul poate adapta layout-ul în funcție de nevoie</li>
+    <div class="screenshot-slot">
+        <img class="screenshot-img" src="img/view-settings.png">
+        <div>Opțiunile de a ascunde sau arăta anumite părți din interfață</div>
+    </div>
+    <div class="page-break"></div>
+    <li><strong>Build</strong> — acțiuni de compilare: Generate Code (generează C++), Build (compilează cu g++ sau alt compilator), Run (execută programul), și setări pentru compilatorul folosit</li>
+    <div class="screenshot-slot">
+        <img class="screenshot-img" src="img/build-menu.png">
+        <div>Meniu cu opțiuni pentru compilare și rulare</div>
+    </div>
+    <div class="screenshot-slot">
+        <img class="screenshot-img" src="img/compile-settigns.png">
+        <div>Meniu de configurare pentru compilare</div>
+    </div>
+</ul>
+
+<div class="divider"></div>
+<div class="page-break"></div>
+
+<p><strong style="font-size:10.5pt;">Sidebar-ul — Paleta de blocuri</strong></p>
+<p>Sidebar-ul este organizat în <strong>categorii cromatice distincte</strong>, fiecare cu o culoare proprie pentru recunoaștere vizuală rapidă:</p>
+
+<div style="margin: 8px 0;">
+  <span class="category-label cat-green">Events</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)">Blocul <strong>Main</strong> — punctul de intrare al programului (echivalent funcției <code>main()</code>)</span>
+</div>
+
+<div style="margin: 8px 0;">
+  <span class="category-label cat-blue">Console</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)"><strong>Write</strong> (cout), <strong>Read into</strong> (cin cu selector de variabilă), <strong>End Line</strong> (endl)</span>
+</div>
+
+<div style="margin: 8px 0;">
+  <span class="category-label cat-orange">Control Flow</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)"><strong>If then</strong>, <strong>Else</strong>, <strong>End If</strong> — construcții condiționale cu slot de expresie</span>
+</div>
+
+<div style="margin: 8px 0;">
+  <span class="category-label cat-purple">Math</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)"><strong>+, −, ×, /, mod</strong> — operații aritmetice; <strong>round, abs, sqrt</strong> — funcții matematice</span>
+</div>
+
+<div style="margin: 8px 0;">
+  <span class="category-label cat-cyan">Logic</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)"><strong>true, false</strong>; comparatori: <strong>&lt;, ≤, &gt;, ≥, =</strong></span>
+</div>
+
+<div style="margin: 8px 0; font-size:9.5pt;">
+  <span class="category-label cat-pink">Variables</span>
+  <span style="font-size:9.5pt; color:var(--text-muted)"> — meniu de creare a variabilelor cu tipuri (int, float, string); variabilele create apar ca blocuri reutilizabile</span>
+</div>
+
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/variable.png">
+    <div>Meniu de creare variabile</div>
+</div>
+
+<div class="divider"></div>
+
+<div class="page-break"></div>
+<p><strong style="font-size:10.5pt;">Canvasul — Zona de lucru</strong></p>
+<ul>
+  <li><strong>Panning:</strong> Click &amp; drag pe fundalul canvas-ului pentru a naviga în spațiul de lucru</li>
+  <li><strong>Drag &amp; drop blocuri:</strong> Blocurile se trag din sidebar pe canvas; odată plasate, pot fi mutate liber</li>
+  <li><strong>Conectare blocuri:</strong> Blocurile se unesc printr-un sistem de snap — blocul de jos are un „slot" în care intră capătul de sus al blocului următor</li>
+  <li><strong>Expresii:</strong> Blocurile de tip expresie (Math, Logic) pot fi introduse în slot-urile altor blocuri (ex. condiția unui If)</li>
+  <li><strong>Meniu contextual (right-click):</strong> Click dreapta pe orice bloc deschide un meniu cu opțiunile <em>Delete</em> (ștergere) și <em>Duplicate</em> (duplicare)</li>
+</ul>
+
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/canvas.png">
+    <div>Blocuri prezente pe zona de lucru. Expresi atașate și right-click menu</div>
+</div>
+
+<div class="divider"></div>
+
+<div class="page-break"></div>
+<p><strong style="font-size:10.5pt;">Panoul de Output</strong></p>
+<ul>
+  <li><strong>Build Log:</strong> Afișează comanda exactă de compilare și rezultatul acesteia (succes / erori de la g++)</li>
+  <li><strong>Run Log:</strong> Afișează output-ul programului compilat la execuție</li>
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/build-output.png">
+    <img class="screenshot-img" src="img/run-output.png">
+    <div>Panoul de output pentru compilare. Se poate observa că programul a fost compilat cu success folosind g++</div>
+</div>
+</ul>
+
+
+<div class="divider"></div>
+
+<div class="page-break"></div>
+<p><strong style="font-size:10.5pt;">Exemplu complet: de la blocuri la C++</strong></p>
+
+<p>Secvența de blocuri de mai jos — <em>Main → Read into a → Write a</em> — este unul din cele mai simple programe posibile: citește un număr și îl afișează înapoi.</p>
+
+<div class="block-demo no-break">
+  <div class="block-demo-label">Blocuri pe canvas</div>
+  <div class="block-row">
+    <span class="b b-green">Main</span>
+  </div>
+  <div class="block-row block-indent">
+    <span class="b b-blue">Read into</span>
+    <span class="b-input">a</span>
+    <span style="color:#6c7086; font-size:8pt; font-family:var(--font-mono)">▼ int</span>
+  </div>
+  <div class="block-row block-indent">
+    <span class="b b-blue">Write</span>
+    <span class="b-input">a</span>
+  </div>
+  <div class="block-row block-indent">
+    <span class="b b-blue">End Line</span>
+  </div>
+</div>
+
+<p class="print-top-margin">Codul C++ generat automat:</p>
+
+<pre><span class="c-kw">#include</span> <span class="c-st">&lt;iostream&gt;</span>
+<span class="c-kw">#include</span> <span class="c-st">&lt;cmath&gt;</span>
+<span class="c-kw">#include</span> <span class="c-st">&lt;string&gt;</span>
+<span class="c-kw">using namespace</span> <span class="c-ty">std</span>;
+
+<span class="c-ty">int</span> <span class="c-fn">main</span>() {
+    <span class="c-ty">int</span> a = <span class="c-nm">0</span>;
+
+    cin >> a;
+    cout << a;
+    cout << endl;
+    <span class="c-kw">return</span> <span class="c-nm">0</span>;
+}</pre>
+
+<div class="page-break"></div>
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/code-view.png">
+    <div>Blocurile pe stânga și codul C++ generate de către PVB pe dreapta</div>
+</div>
+<div class="screenshot-slot">
+    <img class="screenshot-img" src="img/running.png">
+    <div>Programul care rulează</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHAPTER IV — External Resources
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="chapter">
+  <div class="chapter-label">Capitolul IV</div>
+  <div class="chapter-title">Resurse externe</div>
+</div>
+
+<p>Proiectul folosește exclusiv biblioteci open-source. Toate resursele utilizate sunt enumărate mai jos:</p>
+
+<div class="file-list no-break">
+  <div class="file-item">
+    <div class="file-name">Dear ImGui</div>
+    <div class="file-desc">Framework UI immediate-mode. Licență MIT. <a href="https://github.com/ocornut/imgui">github.com/ocornut/imgui</a></div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">ImGuiColorTextEdit</div>
+    <div class="file-desc">Editor de text cu colorare sintactică pentru ImGui. Licență MIT (cu patch custom pentru evidențierea liniei). <a href="https://github.com/BalazsJako/ImGuiColorTextEdit">github.com/BalazsJako/ImGuiColorTextEdit</a></div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">CMake</div>
+    <div class="file-desc">Sistem de build cross-platform. Licență BSD. <a href="https://cmake.org">cmake.org</a></div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">OpenGL</div>
+    <div class="file-desc">API grafică folosită ca backend de randare pentru ImGui.</div>
+  </div>
+  <div class="file-item">
+    <div class="file-name">g++ / GCC</div>
+    <div class="file-desc">Compilatorul C++ utilizat pentru compilarea codului generat. Licență GPL.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CHAPTER V — External Resources
+══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-label">Capitolul V</div>
+  <div class="chapter-title">Concluzie</div>
+</div>
+
+<p>Combinația C++ + Dear ImGui + OpenGL oferă maximul de performanță nativă la o amprentă minimă (9 MB total). Alternativele web (Electron, Qt WebEngine) ar fi adus un overhead de sute de MB și o dependență de browser sau runtime. CMake asigură portabilitatea compilării fără modificări de cod, iar ImGuiColorTextEdit economisește implementarea unui editor de text de la zero, permițând concentrarea efortului pe funcționalitățile centrale.</p>
+<p>PVB rezolvă o problemă reală din educația de informatică: tranziția bruscă de la gândirea vizuală la sintaxa textuală. Cred că un instrument care face această tranziție gradual - lăsând utilizatorul să vadă codul C++ în timp ce construiește vizual - poate reduce teama față de sintaxa complexă și accelera procesul de învățare. Potențialul este real, iar feedback-ul primit de la beta-testeri confirmă că asocierea vizuală funcționează.</p>
+
+<!-- ══════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════ -->
+<div class="footer">
+  <div class="footer-brand">
+    <div class="footer-blocks">
+      <div class="fb" style="background:var(--block-green)"></div>
+      <div class="fb" style="background:var(--block-blue)"></div>
+      <div class="fb" style="background:var(--block-orange)"></div>
+      <div class="fb" style="background:var(--block-purple)"></div>
+    </div>
+    <strong>PVB</strong> — Programare Vizuală prin Blocuri
+  </div>
+  <div>Infoeducație 2026 · Software Utilitar · <a href="https://github.com/matei212/pvb">github.com/matei212/pvb</a></div>
+</div>
+
+</div><!-- /.doc -->
+</body>
+</html>
