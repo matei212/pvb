@@ -67,6 +67,7 @@ target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 add_executable(pvb
     src/main.cpp
     src/ui.cpp
+    src/build.cpp
     src/app.cpp
     src/log.cpp
     src/codegen.cpp

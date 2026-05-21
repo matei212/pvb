@@ -13,6 +13,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include "style.hpp"
+#include "build.hpp"
 
 enum class BlockType
 {
@@ -255,6 +256,8 @@ class CodeView
         void Generate(Canvas &canvas);
         void Draw();
 
+	const std::string &GetCode() const { return m_Code; }
+
     private:
         std::string m_Code;
 };
@@ -292,6 +295,13 @@ class UI
         bool m_ShowSidebar = true;
         bool m_ShowOutputPanel = false;
         bool m_ShowCodeView = false;
+
+	BuildSettings m_BuildSettings;
+	BuildResult m_LastBuild;
+	RunResult m_LastRun;
+
+	bool m_HasBuilt = false;
+	bool m_HasRan = false;
 };
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {

@@ -4,9 +4,11 @@
 #include <iostream>
 #include <algorithm>
 #include <unordered_set>
+#include <fstream>
 
 #include "ui.hpp"
 #include "log.hpp"
+#include "build.hpp"
 
 // Block
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
@@ -33,6 +35,8 @@ static BlockToken parseBlockInput(const char **ch, const char * end);
 static ValueType parseValueType(const std::string &str);
 
 static std::vector<InputValue> buildDefaultInputs(const BlockData &data);
+
+static bool writeTextFile(const std::string& path, const std::string& content);
 
 
 BlockData::BlockData(const BlockDefinition *def)
@@ -408,6 +412,16 @@ static std::vector<InputValue> buildDefaultInputs(const BlockData &data)
     }
 
     return result;
+}
+
+static bool writeTextFile(const std::string& path, const std::string& content)
+{
+    std::ofstream out(path);
+    if (!out.is_open())
+        return false;
+
+    out << content;
+    return true;
 }
 
 static float calcTokenWidth(const BlockToken &tok)
@@ -1326,6 +1340,8 @@ void UI::Render()
 
 void UI::DrawMainMenuBar()
 {
+    bool showPopup = false;
+
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("View")) {
             ImGui::MenuItem("Code View", nullptr, &m_ShowCodeView);
@@ -1341,15 +1357,70 @@ void UI::DrawMainMenuBar()
             }
             if (ImGui::MenuItem("Build")) {
                 m_ShowOutputPanel = true;
+
+		m_CodeView.Generate(m_Canvas);
+		if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
+		    LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
+		}
+
+		BuildResult result = BuildProgram(m_BuildSettings);
+		m_LastBuild = result;
+		m_HasBuilt = true;
             }
             if (ImGui::MenuItem("Run")) {
                 m_ShowOutputPanel = true;
+		if (m_HasBuilt && m_LastBuild.success) {
+		    m_LastRun = RunProgram(m_BuildSettings.outputBinary);
+		    m_HasRan = true;
+		}
             }
 
-            ImGui::EndMenu();
-        }
+	    if (ImGui::MenuItem("Build && Run")) {
+                m_ShowOutputPanel = true;
+		m_LastBuild = BuildProgram(m_BuildSettings);
+
+		if (m_LastBuild.success)
+		    m_LastRun = RunProgram(m_BuildSettings.outputBinary);
+
+		m_HasBuilt = true;
+		m_HasRan = true;
+	    }
+
+	    if (ImGui::MenuItem("Build Settings")) {
+		showPopup = true;
+	    }
+
+	    ImGui::EndMenu();
+	}
 
         ImGui::EndMainMenuBar();
+    }
+
+    if (showPopup) {
+	ImGui::OpenPopup("Build Settings");
+    }
+    if (ImGui::BeginPopupModal("Build Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+	static BuildSettings tempSettings;
+
+	ImGui::InputText("Compiler Path", &tempSettings.compilerPath);
+	ImGui::InputText("Compiler Flags", &tempSettings.compilerFlags);
+	ImGui::InputText("Output Binary", &tempSettings.outputBinary);
+	ImGui::InputText("Source File", &tempSettings.sourceFile);
+
+	ImGui::Separator();
+
+	if (ImGui::Button("Save")) {
+	    m_BuildSettings = tempSettings;
+	    ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Cancel")) {
+	    ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
     }
 }
 
@@ -1401,11 +1472,23 @@ void UI::DrawOutputPanel()
     ImGui::BeginChild("OutputPanel", ImVec2(0.0f, OUTPUT_PANEL_HEIGHT), true);
     if (ImGui::BeginTabBar("Output")) {
 
-        if (ImGui::BeginTabItem("Build Log")) {
+	if (ImGui::BeginTabItem("Build Log")) {
+	    if (m_HasBuilt) {
+		ImGui::BeginChild("BuildLog", ImVec2(0, 0), true,
+			ImGuiWindowFlags_HorizontalScrollbar);
+		ImGui::TextUnformatted(m_LastBuild.output.c_str());
+		ImGui::EndChild();
+	    }
             ImGui::EndTabItem();
         }
 
         if (ImGui::BeginTabItem("Run Log")) {
+	    if (m_HasRan) {
+		ImGui::BeginChild("Ran", ImVec2(0, 0), true,
+			ImGuiWindowFlags_HorizontalScrollbar);
+		ImGui::TextUnformatted(m_LastRun.output.c_str());
+		ImGui::EndChild();
+	    }
             ImGui::EndTabItem();
         }
 
