@@ -42,6 +42,13 @@ enum class BlockCategory
     ControlFlow,
     Math,
     Logic,
+    Variable,
+};
+
+struct CustomVariable
+{
+    std::string name;
+    ValueType type = Value_Int;
 };
 
 struct BlockDefinition
@@ -51,6 +58,11 @@ struct BlockDefinition
     std::string nameFmt;
     std::string description;
     BlockCategory category;
+
+    std::string variableName = "";
+    bool isVariableGetter = false;
+    bool isVariableSetter = false;
+    bool isReadIntoVariable = false;
 };
 
 enum class BlockTokenType
@@ -92,7 +104,7 @@ struct BlockToken
 
 struct BlockData
 {
-    const BlockDefinition *definition;
+    BlockDefinition definition;
     std::vector<BlockToken> tokens;
 
     explicit BlockData(const BlockDefinition *def);
@@ -172,8 +184,22 @@ class Sidebar
         void Update();
         void Draw(UIEventQueue &events);
 
+        const std::vector<CustomVariable> &GetVariables() const { return m_Variables; }
+
     private:
-        std::vector <BlockData> m_Blocks;
+        void DrawAddVariablePopup();
+        bool TryAddVariable(const std::string &name, ValueType type);
+        void RebuildVariableBlocks();
+
+        std::vector<BlockData> m_Blocks;
+        std::vector<BlockData> m_VariableBlocks;
+        std::vector<BlockDefinition> m_VariableDefinitions;
+        std::vector<CustomVariable> m_Variables;
+
+        bool m_ShowAddVariablePopup = false;
+        char m_NewVarName[64] = {};
+        int m_NewVarType = 0;
+        const char *m_AddVariableError = nullptr;
 };
 
 enum class AttachType
@@ -253,10 +279,10 @@ class CodeView
         CodeView() = default;
         ~CodeView() = default;
 
-        void Generate(Canvas &canvas);
+        void Generate(Canvas &canvas, const std::vector<CustomVariable> &variables);
         void Draw();
 
-	const std::string &GetCode() const { return m_Code; }
+    const std::string &GetCode() const { return m_Code; }
 
     private:
         std::string m_Code;
@@ -296,17 +322,18 @@ class UI
         bool m_ShowOutputPanel = false;
         bool m_ShowCodeView = false;
 
-	BuildSettings m_BuildSettings;
-	BuildResult m_LastBuild;
-	RunResult m_LastRun;
+    BuildSettings m_BuildSettings;
+    BuildResult m_LastBuild;
+    RunResult m_LastRun;
 
-	bool m_HasBuilt = false;
-	bool m_HasRan = false;
+    bool m_HasBuilt = false;
+    bool m_HasRan = false;
 };
 
 inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Event,       Value_None,   "Main",                                      "Main entry point",                                        BlockCategory::Event       },
     BlockDefinition { BlockType::Instruction, Value_None,   "Write {any:text=Hello World}",              "Writes to the console",                                   BlockCategory::Console     },
+    BlockDefinition { BlockType::Instruction, Value_None,   "Read into {string:var=}",                   "Reads input from the console into a variable",            BlockCategory::Console,     "", false, false, true },
     BlockDefinition { BlockType::Instruction, Value_None,   "End Line",                                  "Moves to the next line",                                  BlockCategory::Console     },
     BlockDefinition { BlockType::Instruction, Value_None,   "If {bool:val=false} then",                  "Checks for condition",                                    BlockCategory::ControlFlow },
     BlockDefinition { BlockType::Instruction, Value_None,   "Else",                                      "Else",                                                    BlockCategory::ControlFlow },
@@ -317,15 +344,16 @@ inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Expression,  Value_Number, "{number:left=1} / {number:right=1}",        "Divies 2 numbers",                                        BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Number, "{int:left=1} mod {int:right=1}",            "Adds 2 numbers",                                          BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Float,  "round {number:value=0.5}",                  "Rounds a number",                                         BlockCategory::Math        },
-    BlockDefinition { BlockType::Expression,  Value_Float,  "abs {number:value=0.5}",                    "Absolute of a number",                                    BlockCategory::Math        }, BlockDefinition { BlockType::Expression,  Value_Float,  "sqrt {number:value=0.5}",               "Square root of a number",                                 BlockCategory::Math        },
+    BlockDefinition { BlockType::Expression,  Value_Float,  "abs {number:value=0.5}",                    "Absolute of a number",                                    BlockCategory::Math        },
+    BlockDefinition { BlockType::Expression,  Value_Float,  "sqrt {number:value=0.5}",                   "Square root of a number",                                 BlockCategory::Math        },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "true",                                      "true value",                                              BlockCategory::Logic       },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "false",                                     "false value",                                             BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} < {float:right=0.5}",      "Checks if a number is less than another number",          BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} <= {float:right=0.5}",     "Checks if a number is less or equal than another number", BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} > {float:right=0.5}",      "Checks if a number is greater than another number",       BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} >= {float:right=0.5}",     "Checks if a number is greater or equal and another",      BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{float:left=0.5} = {float:right=0.5}",      "Checks if 2 numbers are equal",                           BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "not {bool:value=true}",                    "Negates a condition",                                     BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} and {bool:value=false}", "Ands 2 conditions",                                       BlockCategory::Logic       },
-    BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} or {bool:value=false}",  "Ors 2 conditions",                                        BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{number:left=0.5} < {number:right=0.5}",    "Checks if a number is less than another number",          BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{number:left=0.5} <= {number:right=0.5}",   "Checks if a number is less or equal than another number", BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{number:left=0.5} > {number:right=0.5}",    "Checks if a number is greater than another number",       BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{number:left=0.5} >= {number:right=0.5}",   "Checks if a number is greater or equal and another",      BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{number:left=0.5} = {number:right=0.5}",    "Checks if 2 numbers are equal",                           BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "not {bool:value=true}",                     "Negates a condition",                                     BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} and {bool:value=false}",  "Ands 2 conditions",                                       BlockCategory::Logic       },
+    BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} or {bool:value=false}",   "Ors 2 conditions",                                        BlockCategory::Logic       },
 };

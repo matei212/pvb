@@ -35,7 +35,7 @@ std::unique_ptr<ASTNode> ASTNode::makeUnaryOp(const std::string &op, std::unique
 
 std::unique_ptr<ASTNode> ASTBuilder::build(const BlockInstance &eventBlock, Canvas &canvas)
 {
-    if (eventBlock.data.definition->type != BlockType::Event) {
+    if (eventBlock.data.definition.type != BlockType::Event) {
         LOG_ERROR("ASTBuilder::build() requires an Event block");
         return nullptr;
     }
@@ -63,7 +63,7 @@ uint32_t ASTBuilder::buildStatementChain(uint32_t startId, Canvas &canvas, ASTNo
         }
 
         const BlockInstance &block = *it;
-        const std::string   &fmt  = block.data.definition->nameFmt;
+        const std::string   &fmt  = block.data.definition.nameFmt;
 
         if (fmt == "End If" || fmt == "Else")
             return current;
@@ -98,7 +98,7 @@ uint32_t ASTBuilder::buildIfBody(uint32_t startId, Canvas &canvas, ASTNode &ifNo
     }
 
     auto it  = canvas.FindBlockById(cursor);
-    const std::string &fmt = it->data.definition->nameFmt;
+    const std::string &fmt = it->data.definition.nameFmt;
 
     if (fmt == "Else") {
         auto elseNode = ASTNode::make(ASTNodeKind::Else);
@@ -119,7 +119,7 @@ uint32_t ASTBuilder::buildIfBody(uint32_t startId, Canvas &canvas, ASTNode &ifNo
 
 std::unique_ptr<ASTNode> ASTBuilder::buildStatement(const BlockInstance &block, Canvas &canvas)
 {
-    const std::string &fmt = block.data.definition->nameFmt;
+    const std::string &fmt = block.data.definition.nameFmt;
 
     if (fmt.rfind("Write ", 0) == 0 || fmt == "Write {any:text=Hello World}") {
         auto node  = ASTNode::make(ASTNodeKind::WriteLn);
@@ -130,8 +130,22 @@ std::unique_ptr<ASTNode> ASTBuilder::buildStatement(const BlockInstance &block, 
     if (fmt == "End Line")
         return ASTNode::make(ASTNodeKind::EndLine);
 
+    if (block.data.definition.isReadIntoVariable) {
+        auto node = ASTNode::make(ASTNodeKind::ReadVar);
+        if (!block.inputs.empty())
+            node->sval = block.inputs[0].literal;
+        return node;
+    }
+
     if (fmt.rfind("If ", 0) == 0) {
         auto node = ASTNode::make(ASTNodeKind::If);
+        node->children.push_back(buildInputExpr(block, canvas, 0));
+        return node;
+    }
+
+    if (block.data.definition.isVariableSetter) {
+        auto node = ASTNode::make(ASTNodeKind::Assign);
+        node->sval = block.data.definition.variableName;
         node->children.push_back(buildInputExpr(block, canvas, 0));
         return node;
     }
@@ -159,7 +173,13 @@ std::unique_ptr<ASTNode> ASTBuilder::buildInputExpr(const BlockInstance &block, 
 
 std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, Canvas &canvas)
 {
-    const std::string &fmt = block.data.definition->nameFmt;
+    const std::string &fmt = block.data.definition.nameFmt;
+
+    if (block.data.definition.isVariableGetter) {
+        auto node  = ASTNode::make(ASTNodeKind::VarRef);
+        node->sval = block.data.definition.variableName;
+        return node;
+    }
 
     static const std::vector<std::pair<std::string,std::string>> binOps = {
         { "{number:left=1} + {number:right=1}", "+"   },
@@ -167,13 +187,13 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
         { "{number:left=1} * {number:right=1}", "*"   },
         { "{number:left=1} / {number:right=1}", "/"   },
         { "{int:left=1} mod {int:right=1}",     "%"   },
-        { "{float:left=0.5} < {float:right=0.5}",  "<"  },
-        { "{float:left=0.5} <= {float:right=0.5}", "<=" },
-        { "{float:left=0.5} > {float:right=0.5}",  ">"  },
-        { "{float:left=0.5} >= {float:right=0.5}", ">=" },
-        { "{float:left=0.5} = {float:right=0.5}",  "==" },
-        { "{bool:value=true} and {float:value=false}",   "&&" },
-        { "{bool:value=true} or {float:value=false}",    "||" },
+        { "{number:left=0.5} < {number:right=0.5}",  "<"  },
+        { "{number:left=0.5} <= {number:right=0.5}", "<=" },
+        { "{number:left=0.5} > {number:right=0.5}",  ">"  },
+        { "{number:left=0.5} >= {number:right=0.5}", ">=" },
+        { "{number:left=0.5} = {number:right=0.5}",  "==" },
+        { "{bool:value=true} and {bool:value=false}",   "&&" },
+        { "{bool:value=true} or {bool:value=false}",    "||" },
     };
 
     for (auto &[pattern, op] : binOps) {
@@ -189,7 +209,7 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
         { "round {number:value=0.5}", "round" },
         { "abs {number:value=0.5}",  "abs"   },
         { "sqrt {number:value=0.5}", "sqrt"  },
-        { "not {float:value=true}",     "!"     },
+        { "not {bool:value=true}",     "!"     },
     };
 
     for (auto &[pattern, op] : unaryOps) {
@@ -216,10 +236,11 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
     return ASTNode::makeLiteral("0");
 }
 
-std::string CodeGen::emit(const ASTNode &root)
+std::string CodeGen::emit(const ASTNode &root, const std::vector<CustomVariable> &variables)
 {
     m_Out.clear();
     m_Indent = 0;
+    m_Variables = variables;
 
     if (root.kind != ASTNodeKind::Program) {
         LOG_ERROR("CodeGen::emit() expects an ASTNodeKind::Program root");
@@ -246,9 +267,12 @@ void CodeGen::emitNode(const ASTNode &node)
         case ASTNodeKind::Function:  emitFunction(node); break;
         case ASTNodeKind::WriteLn:   emitWrite(node);    break;
         case ASTNodeKind::EndLine:   emitEndLine(node);  break;
+        case ASTNodeKind::ReadVar:   emitReadVar(node);  break;
         case ASTNodeKind::If:        emitIf(node);       break;
         case ASTNodeKind::Else:      emitElse(node);     break;
         case ASTNodeKind::Literal:   emitLiteral(node);  break;
+        case ASTNodeKind::VarRef:    emitVarRef(node);   break;
+        case ASTNodeKind::Assign:    emitAssign(node);   break;
         case ASTNodeKind::BinOp:     emitBinOp(node);    break;
         case ASTNodeKind::UnaryOp:   emitUnaryOp(node);  break;
         default:
@@ -268,6 +292,18 @@ void CodeGen::emitFunction(const ASTNode &node)
     line("int " + node.sval + "()");
     line("{");
     indent();
+
+    for (const auto &var : m_Variables) {
+        if (var.type == Value_Int)
+            line("int " + var.name + " = 0;");
+        else if (var.type == Value_Float)
+            line("float " + var.name + " = 0.0f;");
+        else if (var.type & Value_String)
+            line("string " + var.name + " = \"\";");
+    }
+
+    if (!m_Variables.empty())
+        line("");
 
     for (auto &child : node.children)
         emitNode(*child);
@@ -296,6 +332,16 @@ void CodeGen::emitWrite(const ASTNode &node)
 void CodeGen::emitEndLine(const ASTNode &)
 {
     line("cout << endl;");
+}
+
+void CodeGen::emitReadVar(const ASTNode &node)
+{
+    if (node.sval.empty()) {
+        LOG_ERROR("Read into variable block has no target variable");
+        return;
+    }
+
+    line("cin >> " + node.sval + ";");
 }
 
 void CodeGen::emitIf(const ASTNode &node)
@@ -347,12 +393,33 @@ void CodeGen::emitExpr(const ASTNode &node)
     switch (node.kind)
     {
         case ASTNodeKind::Literal:  emitLiteral(node);  break;
+        case ASTNodeKind::VarRef:   emitVarRef(node);   break;
         case ASTNodeKind::BinOp:    emitBinOp(node);    break;
         case ASTNodeKind::UnaryOp:  emitUnaryOp(node);  break;
         default:
                                     LOG_ERROR("CodeGen::emitExpr: not an expression node");
                                     break;
     }
+}
+
+void CodeGen::emitVarRef(const ASTNode &node)
+{
+    m_Out += node.sval;
+}
+
+void CodeGen::emitAssign(const ASTNode &node)
+{
+    if (node.children.empty()) {
+        LOG_ERROR("Assign node has no value");
+        return;
+    }
+
+    for (int i = 0; i < m_Indent; ++i)
+        m_Out += "    ";
+
+    m_Out += node.sval + " = ";
+    emitExpr(*node.children[0]);
+    m_Out += ";\n";
 }
 
 void CodeGen::emitLiteral(const ASTNode &node)

@@ -15,10 +15,13 @@ enum class ASTNodeKind
 
     WriteLn,       // "Write"  instruction
     EndLine,       // "End Line" instruction
+    ReadVar,       // "Read into" instruction
     If,            // "If <cond> then" … "End If"
     Else,          // "Else" marker (child of If)
 
     Literal,       // int / float / bool / string literal
+    VarRef,        // reference to a custom variable
+    Assign,        // set variable to a value
     BinOp,         // +  -  *  /  mod  <  <=  >  >=  =  and  or
     UnaryOp,       // not   round   abs   sqrt
 };
@@ -59,7 +62,7 @@ private:
 class CodeGen
 {
 public:
-    std::string emit(const ASTNode &root);
+    std::string emit(const ASTNode &root, const std::vector<CustomVariable> &variables);
 
 private:
     void emitNode(const ASTNode &node);
@@ -68,10 +71,13 @@ private:
     void emitFunction(const ASTNode &node);
     void emitWrite   (const ASTNode &node);
     void emitEndLine (const ASTNode &node);
+    void emitReadVar (const ASTNode &node);
     void emitIf      (const ASTNode &node);
     void emitElse    (const ASTNode &node);
     void emitExpr    (const ASTNode &node);
     void emitLiteral (const ASTNode &node);
+    void emitVarRef  (const ASTNode &node);
+    void emitAssign  (const ASTNode &node);
     void emitBinOp   (const ASTNode &node);
     void emitUnaryOp (const ASTNode &node);
 
@@ -82,4 +88,5 @@ private:
 
     std::string m_Out;
     int         m_Indent = 0;
+    std::vector<CustomVariable> m_Variables;
 };

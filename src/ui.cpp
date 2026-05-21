@@ -14,10 +14,13 @@
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
 static void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, ValueType type);
+static void drawVariablePickerInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, const std::vector<CustomVariable> &variables);
+
+static const std::vector<CustomVariable> *g_VariablePickerVars = nullptr;
 static void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float slotW, float slotH);
 static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos);
 
-static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def, float blockHeight);
+static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition &def, float blockHeight);
 static float calcLiteralWidth(const char *text, ValueType type);
 
 static ImVec2 calcSidebarBlockSize(const BlockData &data);
@@ -40,7 +43,7 @@ static bool writeTextFile(const std::string& path, const std::string& content);
 
 
 BlockData::BlockData(const BlockDefinition *def)
-    : definition(def)
+    : definition(*def)
 {
     assert(def != nullptr);
     assert(!def->nameFmt.empty());
@@ -90,11 +93,11 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     bool hovered = ImGui::IsItemHovered();
 
     ImVec2 textOffset = blockTextOrigin(pos, data.definition, BLOCK_HEIGHT);
-    drawBlockShape(pos.x, pos.y, size.x, size.y, data.definition->type, data.definition->category);
+    drawBlockShape(pos.x, pos.y, size.x, size.y, data.definition.type, data.definition.category);
     drawBlockTokens(textOffset, const_cast<std::vector<BlockToken>&>(data.tokens));
 
     if (hovered) {
-        ImGui::SetTooltip("%s", data.definition->description.c_str());
+        ImGui::SetTooltip("%s", data.definition.description.c_str());
 
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
             events.Push({ UIEventType::BlockInstanciateRequested, 0, &data });
@@ -123,9 +126,9 @@ ImVec2 calcSidebarBlockSize(const BlockData &data)
     return ImVec2(width, BLOCK_HEIGHT);
 }
 
-ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def, float blockHeight)
+ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition &def, float blockHeight)
 {
-    ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
+    ImVec2 textSize = ImGui::CalcTextSize(def.nameFmt.c_str());
 
     return ImVec2(
             pos.x + BLOCK_HPAD,
@@ -226,6 +229,38 @@ void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens)
     }
 }
 
+void drawVariablePickerInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, const std::vector<CustomVariable> &variables)
+{
+    ImGui::SetCursorScreenPos(cursorPos);
+    ImGui::SetNextItemWidth(width);
+    ImGui::PushID(id);
+    ImGui::PushID(inputIndex);
+
+    if (variables.empty()) {
+        ImGui::TextDisabled("(no vars)");
+        ImGui::PopID();
+        ImGui::PopID();
+        return;
+    }
+
+    if (literal.empty())
+        literal = variables[0].name;
+
+    if (ImGui::BeginCombo("##var", literal.c_str())) {
+        for (const auto &var : variables) {
+            bool selected = (var.name == literal);
+            if (ImGui::Selectable(var.name.c_str(), selected))
+                literal = var.name;
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::PopID();
+    ImGui::PopID();
+}
+
 void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, ValueType type)
 {
     ImGui::SetCursorScreenPos(cursorPos);
@@ -263,7 +298,7 @@ void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cur
 {
     expr.size = calcCanvasBlockSize(canvas, expr);
     ImVec2 drawPos = ImVec2(cursorPos.x, cursorPos.y + (slotHeight - expr.size.y) * 0.5f);
-    drawBlockShape(drawPos.x, drawPos.y, expr.size.x, expr.size.y, expr.data.definition->type, expr.data.definition->category);
+    drawBlockShape(drawPos.x, drawPos.y, expr.size.x, expr.size.y, expr.data.definition.type, expr.data.definition.category);
     drawCanvasTokens(canvas, expr, blockTextOrigin(drawPos, expr.data.definition, expr.size.y));
 }
 
@@ -298,6 +333,8 @@ static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursor
                         width,
                         block.size.y);
             }
+        } else if (block.data.definition.isReadIntoVariable && g_VariablePickerVars) {
+            drawVariablePickerInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, *g_VariablePickerVars);
         } else {
             drawLiteralInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, input.type);
         }
@@ -320,6 +357,8 @@ static ImU32 getCategoryColor(BlockCategory category)
             return CATEGORY_MATH_COLOR;
         case BlockCategory::Logic:
             return CATEGORY_LOGIC_COLOR;
+        case BlockCategory::Variable:
+            return CATEGORY_VARIABLE_COLOR;
         default:
             LOG_WARN("unknown category %d", static_cast<int>(category));
             return BLOCK_COLOR;
@@ -512,8 +551,6 @@ static bool rectsOverlap(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax)
 // Block Instance
 void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
 {
-    assert(block.data.definition != nullptr);
-
     if (block.isDragging) {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
@@ -540,8 +577,8 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
             screenPos.y,
             block.size.x,
             block.size.y,
-            block.data.definition->type,
-            block.data.definition->category);
+            block.data.definition.type,
+            block.data.definition.category);
 
     drawCanvasTokens(
             canvas,
@@ -629,6 +666,148 @@ void Sidebar::Update()
     // }
 }
 
+static bool isValidVariableName(const std::string &name)
+{
+    if (name.empty())
+        return false;
+
+    if (!std::isalpha(static_cast<unsigned char>(name[0])) && name[0] != '_')
+        return false;
+
+    for (size_t i = 1; i < name.size(); ++i) {
+        char c = name[i];
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_')
+            return false;
+    }
+
+    static const std::unordered_set<std::string> reserved = {
+        "int", "float", "bool", "string", "true", "false",
+        "if", "else", "while", "for", "return", "main",
+    };
+
+    return reserved.find(name) == reserved.end();
+}
+
+static ValueType variableTypeFromIndex(int index)
+{
+    switch (index) {
+        case 1: return Value_Float;
+        case 2: return Value_String;
+        default: return Value_Int;
+    }
+}
+
+static BlockDefinition makeVariableGetterDef(const CustomVariable &var)
+{
+    return BlockDefinition {
+        BlockType::Expression,
+        var.type,
+        var.name,
+        "Gets the value of variable " + var.name,
+        BlockCategory::Variable,
+        var.name,
+        true,
+        false,
+    };
+}
+
+static BlockDefinition makeVariableSetterDef(const CustomVariable &var)
+{
+    std::string inputType;
+    std::string defaultVal;
+
+    if (var.type == Value_Float) {
+        inputType = "float";
+        defaultVal = "0";
+    } else if (var.type & Value_String) {
+        inputType = "string";
+        defaultVal = "";
+    } else {
+        inputType = "int";
+        defaultVal = "0";
+    }
+
+    std::string nameFmt = "Set " + var.name +  " to {" + inputType + ":val=" + defaultVal + "}";
+
+    return BlockDefinition {
+        BlockType::Instruction,
+        Value_None,
+        nameFmt,
+        "Sets the value of variable " + var.name,
+        BlockCategory::Variable,
+        var.name,
+        false,
+        true,
+    };
+}
+
+void Sidebar::RebuildVariableBlocks()
+{
+    m_VariableDefinitions.clear();
+    m_VariableBlocks.clear();
+
+    for (const auto &var : m_Variables) {
+        m_VariableDefinitions.push_back(makeVariableGetterDef(var));
+        m_VariableBlocks.emplace_back(&m_VariableDefinitions[m_VariableDefinitions.size() - 1]);
+
+        m_VariableDefinitions.push_back(makeVariableSetterDef(var));
+        m_VariableBlocks.emplace_back(&m_VariableDefinitions[m_VariableDefinitions.size() - 1]);
+    }
+}
+
+bool Sidebar::TryAddVariable(const std::string &name, ValueType type)
+{
+    if (!isValidVariableName(name))
+        return false;
+
+    for (const auto &existing : m_Variables) {
+        if (existing.name == name)
+            return false;
+    }
+
+    m_Variables.push_back({ name, type });
+    RebuildVariableBlocks();
+    return true;
+}
+
+void Sidebar::DrawAddVariablePopup()
+{
+    if (m_ShowAddVariablePopup)
+        ImGui::OpenPopup("Add Variable");
+
+    ImGui::SetNextWindowSize(ImVec2(280, 0), ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal("Add Variable", &m_ShowAddVariablePopup, ImGuiWindowFlags_AlwaysAutoResize))
+        return;
+
+    ImGui::InputText("Name", m_NewVarName, sizeof(m_NewVarName));
+    ImGui::Combo("Type", &m_NewVarType, "int\0float\0string\0");
+
+    m_AddVariableError = nullptr;
+
+    if (ImGui::Button("Create", ImVec2(120, 0))) {
+        std::string name = m_NewVarName;
+        if (TryAddVariable(name, variableTypeFromIndex(m_NewVarType))) {
+            m_NewVarName[0] = '\0';
+            m_NewVarType = 0;
+            m_ShowAddVariablePopup = false;
+            ImGui::CloseCurrentPopup();
+        } else {
+            m_AddVariableError = "Invalid or duplicate variable name";
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        m_ShowAddVariablePopup = false;
+        ImGui::CloseCurrentPopup();
+    }
+
+    if (m_AddVariableError)
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", m_AddVariableError);
+
+    ImGui::EndPopup();
+}
+
 void Sidebar::Draw(UIEventQueue &events)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(SIDEBAR_PAD, SIDEBAR_PAD));
@@ -641,6 +820,20 @@ void Sidebar::Draw(UIEventQueue &events)
     for (auto &block : m_Blocks) {
         DrawSidebarBlock(block, events);
     }
+
+    if (!m_VariableBlocks.empty()) {
+        ImGui::Separator();
+        ImGui::TextDisabled("Variables");
+        for (auto &block : m_VariableBlocks) {
+            DrawSidebarBlock(block, events);
+        }
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("+ Add Variable", ImVec2(-1, 0)))
+        m_ShowAddVariablePopup = true;
+
+    DrawAddVariablePopup();
 
     ImGui::PopStyleVar(2);
     ImGui::EndChild();
@@ -948,8 +1141,8 @@ void Canvas::CollectBlockTree(uint32_t id, std::unordered_set<uint32_t>& visited
 std::optional<BlockInstance> Canvas::GetMainBlock()
 {
     for (auto &block : m_Blocks) {
-        if (block.data.definition->type == BlockType::Event
-            && block.data.definition->nameFmt == "Main") {
+        if (block.data.definition.type == BlockType::Event
+            && block.data.definition.nameFmt == "Main") {
             return block;
         }
     }
@@ -1013,19 +1206,19 @@ void Canvas::BringToFront(uint32_t id)
         return;
     }
 
-    std::swap(m_Blocks[idx], m_Blocks.back());
+    // std::swap(m_Blocks[idx], m_Blocks.back());
 }
 
 std::optional<AttachTarget> Canvas::FindAttachTarget(const BlockInstance &instance)
 {
-    if (instance.data.definition->type == BlockType::Expression) return std::nullopt;
+    if (instance.data.definition.type == BlockType::Expression) return std::nullopt;
 
     ImVec2 topNotch = ImVec2(instance.pos.x + BLOCK_NOTCH_OFFSET, instance.pos.y);
     ImVec2 bottomNotch = ImVec2(instance.pos.x + BLOCK_NOTCH_OFFSET, instance.pos.y + instance.size.y);
 
     for (auto &target : m_Blocks) {
         if (target.id == instance.id) continue;
-        if (target.data.definition->type == BlockType::Expression) continue;
+        if (target.data.definition.type == BlockType::Expression) continue;
 
         float dx, dy, dist;
 
@@ -1057,8 +1250,8 @@ std::optional<AttachTarget> Canvas::FindAttachTarget(const BlockInstance &instan
 
 std::optional<InputSocket> Canvas::FindInputSocketTarget(const BlockInstance &instance)
 {
-    if (instance.data.definition->type != BlockType::Expression) return std::nullopt;
-    if (instance.data.definition->outputType == Value_None) return std::nullopt;
+    if (instance.data.definition.type != BlockType::Expression) return std::nullopt;
+    if (instance.data.definition.outputType == Value_None) return std::nullopt;
 
     std::optional<InputSocket> best;
     for (const InputSocket &socket : m_InputSockets) {
@@ -1067,7 +1260,7 @@ std::optional<InputSocket> Canvas::FindInputSocketTarget(const BlockInstance &in
 
         auto owner = FindBlockById(socket.ownerBlockId);
 
-        if ((socket.acceptedTypes & instance.data.definition->outputType) == 0) continue;
+        if ((socket.acceptedTypes & instance.data.definition.outputType) == 0) continue;
         if (owner->inputs[socket.inputIndex].connectedBlockId != 0
             && owner->inputs[socket.inputIndex].connectedBlockId != instance.id) {
             continue;
@@ -1112,7 +1305,7 @@ int32_t Canvas::FindIdxById(uint32_t id)
 
 
 // CodeView
-void CodeView::Generate(Canvas &canvas)
+void CodeView::Generate(Canvas &canvas, const std::vector<CustomVariable> &variables)
 {
     auto main = canvas.GetMainBlock();
     if (!main.has_value()) {
@@ -1123,7 +1316,7 @@ void CodeView::Generate(Canvas &canvas)
     ASTBuilder builder;
     auto ast = builder.build(main.value(), canvas);
     CodeGen generator;
-    m_Code = generator.emit(*ast);
+    m_Code = generator.emit(*ast, variables);
 }
 
 void CodeView::Draw()
@@ -1198,7 +1391,7 @@ void UI::Update()
                             });
 
                     auto inst = m_Canvas.FindBlockById(e.id);
-                    if (inst->data.definition->type == BlockType::Expression) {
+                    if (inst->data.definition.type == BlockType::Expression) {
                         if (inst->parentBlockId != 0) {
                             m_Canvas.DetachExpressionBlock(e.id);
                         }
@@ -1223,7 +1416,7 @@ void UI::Update()
 
                     auto instance = m_Canvas.FindBlockById(e.id);
 
-                    if (instance->data.definition->type != BlockType::Expression) {
+                    if (instance->data.definition.type != BlockType::Expression) {
                         auto target = m_Canvas.FindAttachTarget(*instance);
                         if (target) {
                             m_Canvas.AttachInstance(e.id, target.value());
@@ -1352,13 +1545,13 @@ void UI::DrawMainMenuBar()
 
         if (ImGui::BeginMenu("Build")) {
             if (ImGui::MenuItem("Regenerate Code")) {
-                m_CodeView.Generate(m_Canvas);
+                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
                 m_ShowCodeView = true;
             }
             if (ImGui::MenuItem("Build")) {
                 m_ShowOutputPanel = true;
 
-                m_CodeView.Generate(m_Canvas);
+                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
                 if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
                     LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
                 }
@@ -1377,7 +1570,7 @@ void UI::DrawMainMenuBar()
 
             if (ImGui::MenuItem("Build && Run")) {
                 m_ShowOutputPanel = true;
-                m_CodeView.Generate(m_Canvas);
+                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
                 if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
                     LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
                 }
@@ -1442,6 +1635,8 @@ void UI::DrawWorkspace()
         ImGui::SameLine();
     }
 
+    g_VariablePickerVars = &m_Sidebar.GetVariables();
+
     if (m_ShowCodeView) {
         if (ImGui::BeginTable(
                     "WorkspaceSplit",
@@ -1464,6 +1659,8 @@ void UI::DrawWorkspace()
     } else {
         m_Canvas.Draw(m_EventQueue);
     }
+
+    g_VariablePickerVars = nullptr;
 
     ImGui::PopStyleVar();
     ImGui::EndChild();

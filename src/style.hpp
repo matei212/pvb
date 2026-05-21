@@ -32,6 +32,7 @@ inline constexpr ImU32 CATEGORY_CONSOLE_COLOR = IM_COL32(49, 96, 146, 255);
 inline constexpr ImU32 CATEGORY_CONTROL_COLOR = IM_COL32(196, 128, 10, 255);
 inline constexpr ImU32 CATEGORY_MATH_COLOR    = IM_COL32(113, 49, 196, 255);
 inline constexpr ImU32 CATEGORY_LOGIC_COLOR   = IM_COL32(49, 167, 196, 255);
+inline constexpr ImU32 CATEGORY_VARIABLE_COLOR = IM_COL32(196, 49, 128, 255);
 
 inline constexpr float GRID_STEP = 42.0f;
 inline constexpr ImU32 GRID_COLOR = IM_COL32(50, 50, 50, 255);
