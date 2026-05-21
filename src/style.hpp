@@ -7,6 +7,7 @@ inline constexpr float SIDEBAR_ITEM_VSPACE = 12.0f;
 inline constexpr ImU32 BLOCK_COLOR = IM_COL32(49, 96, 146, 255);
 inline constexpr ImU32 BLOCK_TEXT_COLOR = IM_COL32(245, 248, 252, 255);
 inline constexpr float BLOCK_HPAD = 14.0f;
+inline constexpr float BLOCK_VPAD = 4.0f;
 inline constexpr float BLOCK_HSPACE = 6.0f;
 inline constexpr float BLOCK_NOTCH_WIDTH = 28.0f;
 inline constexpr float BLOCK_NOTCH_HEIGHT = 7.0f;

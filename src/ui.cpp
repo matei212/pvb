@@ -15,7 +15,7 @@ static void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_
 static void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float slotW, float slotH);
 static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos);
 
-static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def);
+static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def, float blockHeight);
 static float calcLiteralWidth(const char *text, ValueType type);
 
 static ImVec2 calcSidebarBlockSize(const BlockData &data);
@@ -85,7 +85,7 @@ void DrawSidebarBlock(const BlockData &data, UIEventQueue &events)
     ImVec2 pos = ImGui::GetItemRectMin();
     bool hovered = ImGui::IsItemHovered();
 
-    ImVec2 textOffset = blockTextOrigin(pos, data.definition);
+    ImVec2 textOffset = blockTextOrigin(pos, data.definition, BLOCK_HEIGHT);
     drawBlockShape(pos.x, pos.y, size.x, size.y, data.definition->type, data.definition->category);
     drawBlockTokens(textOffset, const_cast<std::vector<BlockToken>&>(data.tokens));
 
@@ -119,10 +119,13 @@ ImVec2 calcSidebarBlockSize(const BlockData &data)
     return ImVec2(width, BLOCK_HEIGHT);
 }
 
-ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def)
+ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition *def, float blockHeight)
 {
     ImVec2 textSize = ImGui::CalcTextSize(def->nameFmt.c_str());
-    return ImVec2(pos.x + BLOCK_HPAD, pos.y + (BLOCK_HEIGHT - textSize.y) * 0.5f);
+
+    return ImVec2(
+            pos.x + BLOCK_HPAD,
+            pos.y + (blockHeight - textSize.y) * 0.5f);
 }
 
 float calcLiteralWidth(const char *text, ValueType type)
@@ -235,7 +238,7 @@ void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cur
     expr.size = calcCanvasBlockSize(canvas, expr);
     ImVec2 drawPos = ImVec2(cursorPos.x, cursorPos.y + (slotHeight - expr.size.y) * 0.5f);
     drawBlockShape(drawPos.x, drawPos.y, expr.size.x, expr.size.y, expr.data.definition->type, expr.data.definition->category);
-    drawCanvasTokens(canvas, expr, blockTextOrigin(drawPos, expr.data.definition));
+    drawCanvasTokens(canvas, expr, blockTextOrigin(drawPos, expr.data.definition, expr.size.y));
 }
 
 static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos)
@@ -259,7 +262,15 @@ static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursor
         if (input.connectedBlockId != 0) {
             auto child = canvas.FindBlockById(input.connectedBlockId);
             if (child != canvas.GetBlocks().end()) {
-                drawEmbeddedExpressionBlock(canvas, *child, cursorPos, width, BLOCK_HEIGHT);
+                ImVec2 blockScreenTop = canvas.WorldToScreen(block.pos);
+                float blockTop = blockScreenTop.y;
+                ImVec2 exprPos = ImVec2(cursorPos.x, blockTop);
+                drawEmbeddedExpressionBlock(
+                        canvas,
+                        *child,
+                        exprPos,
+                        width,
+                        block.size.y);
             }
         } else {
             drawLiteralInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, input.type);
@@ -418,13 +429,32 @@ float calcCanvasInputWidth(Canvas &canvas, const InputValue &input)
 static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block)
 {
     float width = BLOCK_HPAD * 2.0f;
+    float height = BLOCK_HEIGHT;
+
     size_t inputIndex = 0;
 
     for (const BlockToken& tok : block.data.tokens) {
         if (tok.type == BlockTokenType::Text) {
             width += ImGui::CalcTextSize(tok.text.c_str()).x;
         } else {
-            width += calcCanvasInputWidth(canvas, block.inputs[inputIndex]);
+            const InputValue &input = block.inputs[inputIndex];
+            width += calcCanvasInputWidth(canvas, input);
+
+             if (input.connectedBlockId != 0) {
+                auto child = canvas.FindBlockById(input.connectedBlockId);
+
+                if (child != canvas.GetBlocks().end()) {
+                    child->size = calcCanvasBlockSize(canvas, *child);
+
+                    float needed =
+                        child->size.y +
+                        BLOCK_VPAD * 2.0f +
+                        BLOCK_NOTCH_HEIGHT;
+
+                    height = std::max(height, needed);
+                }
+            }
+
             inputIndex++;
         }
 
@@ -432,7 +462,7 @@ static ImVec2 calcCanvasBlockSize(Canvas &canvas, const BlockInstance &block)
     }
 
     width = std::max(width, BLOCK_MIN_WIDTH);
-    return ImVec2(width, BLOCK_HEIGHT);
+    return ImVec2(width, height);
 }
 
 static bool rectsOverlap(ImVec2 aMin, ImVec2 aMax, ImVec2 bMin, ImVec2 bMax)
@@ -480,7 +510,7 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
     drawCanvasTokens(
             canvas,
             block,
-            blockTextOrigin(screenPos, block.data.definition));
+            blockTextOrigin(screenPos, block.data.definition, block.size.y));
 
     ImGui::SetCursorScreenPos(screenPos);
     ImGui::InvisibleButton("##block", block.size);
@@ -820,7 +850,7 @@ void Canvas::WalkBlockSequence(uint32_t id, std::function<void (BlockInstance &i
 
 void Canvas::MoveAttachedExpression(BlockInstance &parent)
 {
-    ImVec2 cursor = blockTextOrigin(parent.pos, parent.data.definition);
+    ImVec2 cursor = blockTextOrigin(parent.pos, parent.data.definition, parent.size.y);
 
     size_t inputIndex = 0;
 
@@ -841,7 +871,7 @@ void Canvas::MoveAttachedExpression(BlockInstance &parent)
 
                 child->pos = ImVec2(
                         cursor.x,
-                        cursor.y + (BLOCK_HEIGHT - child->size.y) * 0.5f
+                        cursor.y + (parent.size.y - child->size.y) * 0.5f
                         );
 
                 MoveAttachedExpression(*child);
@@ -895,7 +925,7 @@ void Canvas::AppendBlockInputSockets(BlockInstance &block)
 {
     block.size = calcCanvasBlockSize(*this, block);
 
-    ImVec2 cursor = blockTextOrigin(block.pos, block.data.definition);
+    ImVec2 cursor = blockTextOrigin(block.pos, block.data.definition, block.size.y);
     size_t inputIndex = 0;
 
     for (const BlockToken &tok : block.data.tokens) {
@@ -908,7 +938,7 @@ void Canvas::AppendBlockInputSockets(BlockInstance &block)
 
         InputSocket socket;
         socket.pos = cursor;
-        socket.size = ImVec2(width, BLOCK_HEIGHT);
+        socket.size = ImVec2(width, block.size.y);
         socket.ownerBlockId = block.id;
         socket.inputIndex = static_cast<uint32_t>(inputIndex);
         socket.acceptedTypes = tok.acceptedTypes;
