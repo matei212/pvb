@@ -746,10 +746,10 @@ void Canvas::DuplicateInstance(uint32_t id)
     auto original = FindBlockById(id);
     BlockInstance inst {
         .id         = m_NextId++,
-	.data       = original->data,
-	.pos        = ImVec2(original->pos.x + 40.0f, original->pos.y + 40.0f),
-	.size       = calcSidebarBlockSize(original->data),
-	.inputs     = buildDefaultInputs(original->data),
+    .data       = original->data,
+    .pos        = ImVec2(original->pos.x + 40.0f, original->pos.y + 40.0f),
+    .size       = calcSidebarBlockSize(original->data),
+    .inputs     = buildDefaultInputs(original->data),
 };
     m_Blocks.push_back(std::move(inst));
     LOG_DEBUG("duplicated instance id=%u at (%.0f, %.0f) with id=%u", id, inst.pos.x, inst.pos.y, inst.id);
@@ -1358,69 +1358,69 @@ void UI::DrawMainMenuBar()
             if (ImGui::MenuItem("Build")) {
                 m_ShowOutputPanel = true;
 
-		m_CodeView.Generate(m_Canvas);
-		if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
-		    LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
-		}
+        m_CodeView.Generate(m_Canvas);
+        if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
+            LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
+        }
 
-		BuildResult result = BuildProgram(m_BuildSettings);
-		m_LastBuild = result;
-		m_HasBuilt = true;
+        BuildResult result = BuildProgram(m_BuildSettings);
+        m_LastBuild = result;
+        m_HasBuilt = true;
             }
             if (ImGui::MenuItem("Run")) {
                 m_ShowOutputPanel = true;
-		if (m_HasBuilt && m_LastBuild.success) {
-		    m_LastRun = RunProgram(m_BuildSettings.outputBinary);
-		    m_HasRan = true;
-		}
+        if (m_HasBuilt && m_LastBuild.success) {
+            m_LastRun = RunProgram(m_BuildSettings.outputBinary);
+            m_HasRan = true;
+        }
             }
 
-	    if (ImGui::MenuItem("Build && Run")) {
+        if (ImGui::MenuItem("Build && Run")) {
                 m_ShowOutputPanel = true;
-		m_LastBuild = BuildProgram(m_BuildSettings);
+        m_LastBuild = BuildProgram(m_BuildSettings);
 
-		if (m_LastBuild.success)
-		    m_LastRun = RunProgram(m_BuildSettings.outputBinary);
+        if (m_LastBuild.success)
+            m_LastRun = RunProgram(m_BuildSettings.outputBinary);
 
-		m_HasBuilt = true;
-		m_HasRan = true;
-	    }
+        m_HasBuilt = true;
+        m_HasRan = true;
+        }
 
-	    if (ImGui::MenuItem("Build Settings")) {
-		showPopup = true;
-	    }
+        if (ImGui::MenuItem("Build Settings")) {
+        showPopup = true;
+        }
 
-	    ImGui::EndMenu();
-	}
+        ImGui::EndMenu();
+    }
 
         ImGui::EndMainMenuBar();
     }
 
     if (showPopup) {
-	ImGui::OpenPopup("Build Settings");
+    ImGui::OpenPopup("Build Settings");
     }
     if (ImGui::BeginPopupModal("Build Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-	static BuildSettings tempSettings;
+    static BuildSettings tempSettings;
 
-	ImGui::InputText("Compiler Path", &tempSettings.compilerPath);
-	ImGui::InputText("Compiler Flags", &tempSettings.compilerFlags);
-	ImGui::InputText("Output Binary", &tempSettings.outputBinary);
-	ImGui::InputText("Source File", &tempSettings.sourceFile);
+    ImGui::InputText("Compiler Path", &tempSettings.compilerPath);
+    ImGui::InputText("Compiler Flags", &tempSettings.compilerFlags);
+    ImGui::InputText("Output Binary", &tempSettings.outputBinary);
+    ImGui::InputText("Source File", &tempSettings.sourceFile);
 
-	ImGui::Separator();
+    ImGui::Separator();
 
-	if (ImGui::Button("Save")) {
-	    m_BuildSettings = tempSettings;
-	    ImGui::CloseCurrentPopup();
-	}
+    if (ImGui::Button("Save")) {
+        m_BuildSettings = tempSettings;
+        ImGui::CloseCurrentPopup();
+    }
 
-	ImGui::SameLine();
+    ImGui::SameLine();
 
-	if (ImGui::Button("Cancel")) {
-	    ImGui::CloseCurrentPopup();
-	}
+    if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
+    }
 
-	ImGui::EndPopup();
+    ImGui::EndPopup();
     }
 }
 
@@ -1472,23 +1472,23 @@ void UI::DrawOutputPanel()
     ImGui::BeginChild("OutputPanel", ImVec2(0.0f, OUTPUT_PANEL_HEIGHT), true);
     if (ImGui::BeginTabBar("Output")) {
 
-	if (ImGui::BeginTabItem("Build Log")) {
-	    if (m_HasBuilt) {
-		ImGui::BeginChild("BuildLog", ImVec2(0, 0), true,
-			ImGuiWindowFlags_HorizontalScrollbar);
-		ImGui::TextUnformatted(m_LastBuild.output.c_str());
-		ImGui::EndChild();
-	    }
+    if (ImGui::BeginTabItem("Build Log")) {
+        if (m_HasBuilt) {
+        ImGui::BeginChild("BuildLog", ImVec2(0, 0), true,
+            ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::TextUnformatted(m_LastBuild.output.c_str());
+        ImGui::EndChild();
+        }
             ImGui::EndTabItem();
         }
 
         if (ImGui::BeginTabItem("Run Log")) {
-	    if (m_HasRan) {
-		ImGui::BeginChild("Ran", ImVec2(0, 0), true,
-			ImGuiWindowFlags_HorizontalScrollbar);
-		ImGui::TextUnformatted(m_LastRun.output.c_str());
-		ImGui::EndChild();
-	    }
+        if (m_HasRan) {
+        ImGui::BeginChild("Ran", ImVec2(0, 0), true,
+            ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::TextUnformatted(m_LastRun.output.c_str());
+        ImGui::EndChild();
+        }
             ImGui::EndTabItem();
         }
 
