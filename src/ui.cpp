@@ -1401,7 +1401,7 @@ void CodeView::Sync(Canvas &canvas, const std::vector<CustomVariable> &variables
         m_Editor->SetReadOnly(true);
         m_Editor->SetShowWhitespaces(false);
         m_Editor->SetHandleMouseInputs(true);
-        m_Editor->SetHandleKeyboardInputs(false);
+        m_Editor->SetHandleKeyboardInputs(true);
         m_Editor->SetImGuiChildIgnored(false);
         m_Initialized = true;
     }
