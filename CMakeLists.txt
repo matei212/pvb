@@ -64,6 +64,14 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
+add_library(imgui_color_text_edit STATIC
+    third_party/ImGuiColorTextEdit/TextEditor.cpp
+)
+target_include_directories(imgui_color_text_edit PUBLIC
+    third_party/ImGuiColorTextEdit
+)
+target_link_libraries(imgui_color_text_edit PUBLIC imgui)
+
 add_executable(pvb
     src/main.cpp
     src/ui.cpp
@@ -74,7 +82,7 @@ add_executable(pvb
 )
 
 target_include_directories(pvb PRIVATE src)
-target_link_libraries(pvb PRIVATE imgui)
+target_link_libraries(pvb PRIVATE imgui imgui_color_text_edit)
 
 if(MSVC)
     target_compile_options(pvb PRIVATE /W4 /permissive-)

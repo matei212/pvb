@@ -34,6 +34,9 @@ inline constexpr ImU32 CATEGORY_MATH_COLOR    = IM_COL32(113, 49, 196, 255);
 inline constexpr ImU32 CATEGORY_LOGIC_COLOR   = IM_COL32(49, 167, 196, 255);
 inline constexpr ImU32 CATEGORY_VARIABLE_COLOR = IM_COL32(196, 49, 128, 255);
 
+inline constexpr ImU32 BLOCK_HIGHLIGHT_FILL   = IM_COL32(255, 220, 80, 90);
+inline constexpr ImU32 BLOCK_HIGHLIGHT_BORDER = IM_COL32(255, 220, 80, 220);
+
 inline constexpr float GRID_STEP = 42.0f;
 inline constexpr ImU32 GRID_COLOR = IM_COL32(50, 50, 50, 255);
 

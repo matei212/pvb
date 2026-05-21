@@ -1,5 +1,7 @@
 #include "codegen.hpp"
 
+#include <algorithm>
+
 std::unique_ptr<ASTNode> ASTNode::make(ASTNodeKind k)
 {
     auto n   = std::make_unique<ASTNode>();
@@ -42,7 +44,8 @@ std::unique_ptr<ASTNode> ASTBuilder::build(const BlockInstance &eventBlock, Canv
 
     auto program  = ASTNode::make(ASTNodeKind::Program);
     auto function = ASTNode::make(ASTNodeKind::Function);
-    function->sval = "main"; // event name (extend if you have named events)
+    function->sval = "main";
+    function->blockId = eventBlock.id;
 
     uint32_t nextId = eventBlock.nextId;
     buildStatementChain(nextId, canvas, *function);
@@ -123,15 +126,20 @@ std::unique_ptr<ASTNode> ASTBuilder::buildStatement(const BlockInstance &block, 
 
     if (fmt.rfind("Write ", 0) == 0 || fmt == "Write {any:text=Hello World}") {
         auto node  = ASTNode::make(ASTNodeKind::WriteLn);
+        node->blockId = block.id;
         node->children.push_back(buildInputExpr(block, canvas, 0));
         return node;
     }
 
-    if (fmt == "End Line")
-        return ASTNode::make(ASTNodeKind::EndLine);
+    if (fmt == "End Line") {
+        auto node = ASTNode::make(ASTNodeKind::EndLine);
+        node->blockId = block.id;
+        return node;
+    }
 
     if (block.data.definition.isReadIntoVariable) {
         auto node = ASTNode::make(ASTNodeKind::ReadVar);
+        node->blockId = block.id;
         if (!block.inputs.empty())
             node->sval = block.inputs[0].literal;
         return node;
@@ -139,12 +147,14 @@ std::unique_ptr<ASTNode> ASTBuilder::buildStatement(const BlockInstance &block, 
 
     if (fmt.rfind("If ", 0) == 0) {
         auto node = ASTNode::make(ASTNodeKind::If);
+        node->blockId = block.id;
         node->children.push_back(buildInputExpr(block, canvas, 0));
         return node;
     }
 
     if (block.data.definition.isVariableSetter) {
         auto node = ASTNode::make(ASTNodeKind::Assign);
+        node->blockId = block.id;
         node->sval = block.data.definition.variableName;
         node->children.push_back(buildInputExpr(block, canvas, 0));
         return node;
@@ -177,6 +187,7 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
 
     if (block.data.definition.isVariableGetter) {
         auto node  = ASTNode::make(ASTNodeKind::VarRef);
+        node->blockId = block.id;
         node->sval = block.data.definition.variableName;
         return node;
     }
@@ -198,10 +209,12 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
 
     for (auto &[pattern, op] : binOps) {
         if (fmt == pattern) {
-            return ASTNode::makeBinOp(
+            auto node = ASTNode::makeBinOp(
                     op,
                     buildInputExpr(block, canvas, 0),
                     buildInputExpr(block, canvas, 1));
+            node->blockId = block.id;
+            return node;
         }
     }
 
@@ -214,37 +227,46 @@ std::unique_ptr<ASTNode> ASTBuilder::buildExprBlock(const BlockInstance &block, 
 
     for (auto &[pattern, op] : unaryOps) {
         if (fmt == pattern) {
-            return ASTNode::makeUnaryOp(
+            auto node = ASTNode::makeUnaryOp(
                     op,
                     buildInputExpr(block, canvas, 0));
+            node->blockId = block.id;
+            return node;
         }
     }
 
     if (fmt == "true") {
         auto n  = ASTNode::makeLiteral("true");
+        n->blockId = block.id;
         return n;
     }
     if (fmt == "false") {
         auto n  = ASTNode::makeLiteral("false");
+        n->blockId = block.id;
         return n;
     }
 
     // Fallback: treat the block's first literal input as a raw value
-    if (!block.inputs.empty())
-        return ASTNode::makeLiteral(block.inputs[0].literal);
+    if (!block.inputs.empty()) {
+        auto n = ASTNode::makeLiteral(block.inputs[0].literal);
+        n->blockId = block.id;
+        return n;
+    }
 
     return ASTNode::makeLiteral("0");
 }
 
-std::string CodeGen::emit(const ASTNode &root, const std::vector<CustomVariable> &variables)
+CodeGenResult CodeGen::emit(const ASTNode &root, const std::vector<CustomVariable> &variables)
 {
     m_Out.clear();
     m_Indent = 0;
+    m_CurrentLine = 0;
+    m_Result = {};
     m_Variables = variables;
 
     if (root.kind != ASTNodeKind::Program) {
         LOG_ERROR("CodeGen::emit() expects an ASTNodeKind::Program root");
-        return "";
+        return {};
     }
 
     // Standard headers
@@ -256,7 +278,30 @@ std::string CodeGen::emit(const ASTNode &root, const std::vector<CustomVariable>
 
     emitNode(root);
 
-    return m_Out;
+    m_Result.code = m_Out;
+    return m_Result;
+}
+
+void CodeGen::recordBlockLine(uint32_t blockId)
+{
+    if (blockId == 0)
+        return;
+
+    m_Result.blockToLine[blockId] = m_CurrentLine;
+    m_Result.lineToBlocks[m_CurrentLine].push_back(blockId);
+}
+
+void CodeGen::recordExprTree(const ASTNode &node, int line)
+{
+    if (node.blockId != 0) {
+        m_Result.blockToLine[node.blockId] = line;
+        auto &blocks = m_Result.lineToBlocks[line];
+        if (std::find(blocks.begin(), blocks.end(), node.blockId) == blocks.end())
+            blocks.push_back(node.blockId);
+    }
+
+    for (const auto &child : node.children)
+        recordExprTree(*child, line);
 }
 
 void CodeGen::emitNode(const ASTNode &node)
@@ -290,6 +335,7 @@ void CodeGen::emitProgram(const ASTNode &node)
 void CodeGen::emitFunction(const ASTNode &node)
 {
     line("int " + node.sval + "()");
+    recordBlockLine(node.blockId);
     line("{");
     indent();
 
@@ -320,18 +366,23 @@ void CodeGen::emitWrite(const ASTNode &node)
         return;
     }
 
-    // Begin the line with the indentation + "cout << "
+    ++m_CurrentLine;
+
     for (int i = 0; i < m_Indent; ++i)
         m_Out += "    ";
 
     m_Out += "cout << ";
     emitExpr(*node.children[0]);
     m_Out += ";\n";
+
+    recordBlockLine(node.blockId);
+    recordExprTree(*node.children[0], m_CurrentLine);
 }
  
-void CodeGen::emitEndLine(const ASTNode &)
+void CodeGen::emitEndLine(const ASTNode &node)
 {
     line("cout << endl;");
+    recordBlockLine(node.blockId);
 }
 
 void CodeGen::emitReadVar(const ASTNode &node)
@@ -342,6 +393,7 @@ void CodeGen::emitReadVar(const ASTNode &node)
     }
 
     line("cin >> " + node.sval + ";");
+    recordBlockLine(node.blockId);
 }
 
 void CodeGen::emitIf(const ASTNode &node)
@@ -351,11 +403,16 @@ void CodeGen::emitIf(const ASTNode &node)
         return;
     }
 
+    ++m_CurrentLine;
+
     for (int i = 0; i < m_Indent; ++i)
         m_Out += "    ";
     m_Out += "if (";
     emitExpr(*node.children[0]);
     m_Out += ")\n";
+
+    recordBlockLine(node.blockId);
+    recordExprTree(*node.children[0], m_CurrentLine);
 
     line("{");
     indent();
@@ -414,12 +471,17 @@ void CodeGen::emitAssign(const ASTNode &node)
         return;
     }
 
+    ++m_CurrentLine;
+
     for (int i = 0; i < m_Indent; ++i)
         m_Out += "    ";
 
     m_Out += node.sval + " = ";
     emitExpr(*node.children[0]);
     m_Out += ";\n";
+
+    recordBlockLine(node.blockId);
+    recordExprTree(*node.children[0], m_CurrentLine);
 }
 
 void CodeGen::emitLiteral(const ASTNode &node)
@@ -502,6 +564,7 @@ void CodeGen::dedent()  { if (m_Indent > 0) --m_Indent; }
 
 void CodeGen::line(const std::string &s)
 {
+    ++m_CurrentLine;
     for (int i = 0; i < m_Indent; ++i)
         m_Out += "    ";
     m_Out += s;

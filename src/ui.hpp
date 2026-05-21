@@ -5,6 +5,7 @@
 #include <functional>
 #include <optional>
 #include <unordered_set>
+#include <memory>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -14,6 +15,7 @@
 
 #include "style.hpp"
 #include "build.hpp"
+#include "sourcemap.hpp"
 
 enum class BlockType
 {
@@ -255,9 +257,13 @@ class Canvas
 
         std::vector<BlockInstance> &GetBlocks() { return m_Blocks; };
 
+        void SetHighlightedBlocks(const std::unordered_set<uint32_t> &blockIds);
+        bool IsBlockHighlighted(uint32_t blockId) const;
+
         bool IsDraggingBlock = false;
 
     private:
+        std::unordered_set<uint32_t> m_HighlightedBlockIds;
         std::vector<BlockInstance> m_Blocks;
         uint32_t m_NextId = 1;
 
@@ -271,21 +277,28 @@ class Canvas
 void DrawCanvasBlock(Canvas &canvas, BlockInstance &Block, UIEventQueue &events);
 void UpdateCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events);
 
-#include "codegen.hpp"
+class TextEditor;
 
 class CodeView
 {
     public:
-        CodeView() = default;
-        ~CodeView() = default;
+        CodeView();
+        ~CodeView();
 
-        void Generate(Canvas &canvas, const std::vector<CustomVariable> &variables);
-        void Draw();
+        void Sync(Canvas &canvas, const std::vector<CustomVariable> &variables);
+        void Draw(uint32_t hoveredCanvasBlockId);
 
-    const std::string &GetCode() const { return m_Code; }
+        const std::string &GetCode() const { return m_Result.code; }
+        const CodeGenResult &GetResult() const { return m_Result; }
+        uint32_t GetHoveredBlockId() const { return m_HoveredBlockId; }
 
     private:
-        std::string m_Code;
+        void ApplyLineHighlights(uint32_t hoveredCanvasBlockId);
+
+        std::unique_ptr<TextEditor> m_Editor;
+        CodeGenResult m_Result;
+        uint32_t m_HoveredBlockId = 0;
+        bool m_Initialized = false;
 };
 
 class UI
@@ -357,3 +370,5 @@ inline const std::vector<BlockDefinition> g_BlockDefinitions = {
     BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} and {bool:value=false}",  "Ands 2 conditions",                                       BlockCategory::Logic       },
     BlockDefinition { BlockType::Expression,  Value_Bool,   "{bool:value=true} or {bool:value=false}",   "Ors 2 conditions",                                        BlockCategory::Logic       },
 };
+
+#include "codegen.hpp"

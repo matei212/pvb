@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "sourcemap.hpp"
 #include "ui.hpp"
 #include "log.hpp"
 
@@ -33,6 +34,7 @@ struct ASTNode
     std::string sval;   // string value or operator symbol
     double      nval = 0.0;
     bool        bval = false;
+    uint32_t    blockId = 0;
 
     std::vector<std::unique_ptr<ASTNode>> children;
 
@@ -62,7 +64,7 @@ private:
 class CodeGen
 {
 public:
-    std::string emit(const ASTNode &root, const std::vector<CustomVariable> &variables);
+    CodeGenResult emit(const ASTNode &root, const std::vector<CustomVariable> &variables);
 
 private:
     void emitNode(const ASTNode &node);
@@ -85,8 +87,12 @@ private:
     void dedent();
     void line(const std::string &s);
     void append(const std::string &s);
+    void recordBlockLine(uint32_t blockId);
+    void recordExprTree(const ASTNode &node, int line);
 
     std::string m_Out;
     int         m_Indent = 0;
+    int         m_CurrentLine = 0;
+    CodeGenResult m_Result;
     std::vector<CustomVariable> m_Variables;
 };

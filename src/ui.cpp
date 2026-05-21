@@ -10,6 +10,8 @@
 #include "log.hpp"
 #include "build.hpp"
 
+#include "TextEditor.h"
+
 // Block
 static void drawBlockShape(float x, float y, float width, float height, BlockType type = BlockType::Instruction, BlockCategory category = BlockCategory::Event);
 static void drawBlockTokens(ImVec2 cursorPos, std::vector<BlockToken> &tokens);
@@ -17,7 +19,8 @@ static void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_
 static void drawVariablePickerInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t inputIndex, std::string &literal, const std::vector<CustomVariable> &variables);
 
 static const std::vector<CustomVariable> *g_VariablePickerVars = nullptr;
-static void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float slotW, float slotH);
+static void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 drawPos);
+static ImVec2 calcEmbeddedExpressionScreenPos(Canvas &canvas, const BlockInstance &parent, float slotX, const BlockInstance &child);
 static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursorPos);
 
 static ImVec2 blockTextOrigin(ImVec2 pos, const BlockDefinition &def, float blockHeight);
@@ -294,11 +297,37 @@ void drawLiteralInput(ImVec2 cursorPos, float width, uint32_t id, uint32_t input
     ImGui::PopID();
 }
 
-void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 cursorPos, float, float slotHeight)
+static ImVec2 calcEmbeddedExpressionScreenPos(Canvas &canvas, const BlockInstance &parent, float slotX, const BlockInstance &child)
+{
+    ImVec2 parentScreen = canvas.WorldToScreen(parent.pos);
+    float childY = parentScreen.y + (parent.size.y - child.size.y) * 0.5f;
+    return ImVec2(slotX, childY);
+}
+
+void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 drawPos)
 {
     expr.size = calcCanvasBlockSize(canvas, expr);
-    ImVec2 drawPos = ImVec2(cursorPos.x, cursorPos.y + (slotHeight - expr.size.y) * 0.5f);
+    ImVec2 mouse = ImGui::GetIO().MousePos;
+    expr.isHovered = mouse.x >= drawPos.x && mouse.x <= drawPos.x + expr.size.x
+        && mouse.y >= drawPos.y && mouse.y <= drawPos.y + expr.size.y;
+
     drawBlockShape(drawPos.x, drawPos.y, expr.size.x, expr.size.y, expr.data.definition.type, expr.data.definition.category);
+
+    if (canvas.IsBlockHighlighted(expr.id)) {
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+        drawList->AddRectFilled(
+                drawPos,
+                ImVec2(drawPos.x + expr.size.x, drawPos.y + expr.size.y),
+                BLOCK_HIGHLIGHT_FILL);
+        drawList->AddRect(
+                drawPos,
+                ImVec2(drawPos.x + expr.size.x, drawPos.y + expr.size.y),
+                BLOCK_HIGHLIGHT_BORDER,
+                0.0f,
+                0,
+                2.0f);
+    }
+
     drawCanvasTokens(canvas, expr, blockTextOrigin(drawPos, expr.data.definition, expr.size.y));
 }
 
@@ -323,15 +352,9 @@ static void drawCanvasTokens(Canvas &canvas, BlockInstance &block, ImVec2 cursor
         if (input.connectedBlockId != 0) {
             auto child = canvas.FindBlockById(input.connectedBlockId);
             if (child != canvas.GetBlocks().end()) {
-                ImVec2 blockScreenTop = canvas.WorldToScreen(block.pos);
-                float blockTop = blockScreenTop.y;
-                ImVec2 exprPos = ImVec2(cursorPos.x, blockTop);
-                drawEmbeddedExpressionBlock(
-                        canvas,
-                        *child,
-                        exprPos,
-                        width,
-                        block.size.y);
+                child->size = calcCanvasBlockSize(canvas, *child);
+                ImVec2 exprPos = calcEmbeddedExpressionScreenPos(canvas, block, cursorPos.x, *child);
+                drawEmbeddedExpressionBlock(canvas, *child, exprPos);
             }
         } else if (block.data.definition.isReadIntoVariable && g_VariablePickerVars) {
             drawVariablePickerInput(cursorPos, width, block.id, static_cast<uint32_t>(inputIndex), input.literal, *g_VariablePickerVars);
@@ -579,6 +602,12 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
             block.size.y,
             block.data.definition.type,
             block.data.definition.category);
+
+    if (canvas.IsBlockHighlighted(block.id)) {
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+        drawList->AddRectFilled(screenPos, ImVec2(screenPos.x + block.size.x, screenPos.y + block.size.y), BLOCK_HIGHLIGHT_FILL);
+        drawList->AddRect(screenPos, ImVec2(screenPos.x + block.size.x, screenPos.y + block.size.y), BLOCK_HIGHLIGHT_BORDER, 0.0f, 0, 2.0f);
+    }
 
     drawCanvasTokens(
             canvas,
@@ -866,6 +895,13 @@ void Canvas::Update(UIEventQueue &events)
     }
 
     for (auto &block : m_Blocks) {
+        if (block.parentBlockId == 0)
+            MoveAttachedExpression(block);
+    }
+
+    for (auto &block : m_Blocks) {
+        if (block.parentBlockId != 0 && !block.isDragging)
+            continue;
         UpdateCanvasBlock(*this, block, events);
     }
 }
@@ -1100,7 +1136,7 @@ void Canvas::MoveAttachedExpression(BlockInstance &parent)
 
                 child->pos = ImVec2(
                         cursor.x,
-                        cursor.y + (parent.size.y - child->size.y) * 0.5f
+                        parent.pos.y + (parent.size.y - child->size.y) * 0.5f
                         );
 
                 MoveAttachedExpression(*child);
@@ -1172,6 +1208,12 @@ void Canvas::AppendBlockInputSockets(BlockInstance &block)
         socket.inputIndex = static_cast<uint32_t>(inputIndex);
         socket.acceptedTypes = tok.acceptedTypes;
         m_InputSockets.push_back(socket);
+
+        if (block.inputs[inputIndex].connectedBlockId != 0) {
+            auto child = FindBlockById(block.inputs[inputIndex].connectedBlockId);
+            if (child != m_Blocks.end())
+                AppendBlockInputSockets(*child);
+        }
 
         cursor.x += width + BLOCK_HSPACE;
         inputIndex++;
@@ -1305,35 +1347,84 @@ int32_t Canvas::FindIdxById(uint32_t id)
 
 
 // CodeView
-void CodeView::Generate(Canvas &canvas, const std::vector<CustomVariable> &variables)
+CodeView::CodeView() = default;
+
+CodeView::~CodeView() = default;
+
+void CodeView::Sync(Canvas &canvas, const std::vector<CustomVariable> &variables)
 {
+    if (!m_Initialized) {
+        m_Editor = std::make_unique<TextEditor>();
+        m_Editor->SetLanguageDefinition(TextEditor::LanguageDefinition::CPlusPlus());
+        m_Editor->SetPalette(TextEditor::GetDarkPalette());
+        m_Editor->SetReadOnly(true);
+        m_Editor->SetShowWhitespaces(false);
+        m_Editor->SetHandleMouseInputs(true);
+        m_Editor->SetHandleKeyboardInputs(false);
+        m_Editor->SetImGuiChildIgnored(false);
+        m_Initialized = true;
+    }
+
     auto main = canvas.GetMainBlock();
     if (!main.has_value()) {
         LOG_ERROR("no main block in program");
+        m_Result = {};
+        m_Editor->SetText("");
         return;
     }
 
     ASTBuilder builder;
     auto ast = builder.build(main.value(), canvas);
+    if (!ast) {
+        m_Result = {};
+        m_Editor->SetText("");
+        return;
+    }
+
     CodeGen generator;
-    m_Code = generator.emit(*ast, variables);
+    m_Result = generator.emit(*ast, variables);
+    m_Editor->SetText(m_Result.code);
 }
 
-void CodeView::Draw()
+void CodeView::ApplyLineHighlights(uint32_t hoveredCanvasBlockId)
 {
+    TextEditor::Breakpoints lines;
+
+    if (hoveredCanvasBlockId != 0) {
+        int line = m_Result.lineForBlock(hoveredCanvasBlockId);
+        if (line > 0)
+            lines.insert(line);
+    }
+
+    m_Editor->SetHighlightLines(lines);
+}
+
+void CodeView::Draw(uint32_t hoveredCanvasBlockId)
+{
+    ApplyLineHighlights(hoveredCanvasBlockId);
+
     ImGui::BeginChild("CodeView", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-
-    ImGui::SetWindowFontScale(1.3f);
-    ImGui::InputTextMultiline(
-            "##code",
-            &m_Code,
-            ImVec2(-FLT_MIN, -FLT_MIN),
-            ImGuiInputTextFlags_ReadOnly);
-    ImGui::SetWindowFontScale(1.0f);
-
-    ImGui::PopStyleVar();
+    m_Editor->Render("GeneratedCode", ImVec2(0, 0), true);
     ImGui::EndChild();
+
+    m_HoveredBlockId = 0;
+    int hoveredLine = m_Editor->GetHoveredLine();
+    if (hoveredLine > 0) {
+        for (uint32_t blockId : m_Result.blocksForLine(hoveredLine)) {
+            m_HoveredBlockId = blockId;
+            break;
+        }
+    }
+}
+
+void Canvas::SetHighlightedBlocks(const std::unordered_set<uint32_t> &blockIds)
+{
+    m_HighlightedBlockIds = blockIds;
+}
+
+bool Canvas::IsBlockHighlighted(uint32_t blockId) const
+{
+    return m_HighlightedBlockIds.find(blockId) != m_HighlightedBlockIds.end();
 }
 
 
@@ -1403,10 +1494,20 @@ void UI::Update()
                 }
             case UIEventType::BlockDragged:
                 {
-                    m_Canvas.WalkBlockSequence(
-                            e.id,
-                            [this, &e](BlockInstance &inst) { inst.pos.x += e.delta.x; inst.pos.y += e.delta.y; }
-                            );
+                    auto inst = m_Canvas.FindBlockById(e.id);
+                    if (inst->data.definition.type == BlockType::Expression) {
+                        inst->pos.x += e.delta.x;
+                        inst->pos.y += e.delta.y;
+                        m_Canvas.MoveAttachedExpression(*inst);
+                    } else {
+                        m_Canvas.WalkBlockSequence(
+                                e.id,
+                                [this, &e](BlockInstance &inst) {
+                                    inst.pos.x += e.delta.x;
+                                    inst.pos.y += e.delta.y;
+                                    m_Canvas.MoveAttachedExpression(inst);
+                                });
+                    }
                     break;
                 }
             case UIEventType::BlockDragEnded:
@@ -1545,13 +1646,13 @@ void UI::DrawMainMenuBar()
 
         if (ImGui::BeginMenu("Build")) {
             if (ImGui::MenuItem("Regenerate Code")) {
-                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
+                m_CodeView.Sync(m_Canvas, m_Sidebar.GetVariables());
                 m_ShowCodeView = true;
             }
             if (ImGui::MenuItem("Build")) {
                 m_ShowOutputPanel = true;
 
-                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
+                m_CodeView.Sync(m_Canvas, m_Sidebar.GetVariables());
                 if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
                     LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
                 }
@@ -1570,7 +1671,7 @@ void UI::DrawMainMenuBar()
 
             if (ImGui::MenuItem("Build && Run")) {
                 m_ShowOutputPanel = true;
-                m_CodeView.Generate(m_Canvas, m_Sidebar.GetVariables());
+                m_CodeView.Sync(m_Canvas, m_Sidebar.GetVariables());
                 if (!writeTextFile(m_BuildSettings.sourceFile, m_CodeView.GetCode())) {
                     LOG_ERROR("failed to write file %s", m_BuildSettings.sourceFile.c_str());
                 }
@@ -1621,6 +1722,37 @@ void UI::DrawMainMenuBar()
     }
 }
 
+static void drawCanvasHighlightOverlays(Canvas &canvas)
+{
+    ImDrawList *drawList = ImGui::GetForegroundDrawList();
+
+    for (const BlockInstance &block : canvas.GetBlocks()) {
+        if (!canvas.IsBlockHighlighted(block.id))
+            continue;
+
+        ImVec2 p0 = canvas.WorldToScreen(block.pos);
+        ImVec2 p1 = ImVec2(p0.x + block.size.x, p0.y + block.size.y);
+        drawList->AddRectFilled(p0, p1, BLOCK_HIGHLIGHT_FILL);
+        drawList->AddRect(p0, p1, BLOCK_HIGHLIGHT_BORDER, 0.0f, 0, 2.0f);
+    }
+}
+
+static uint32_t findCanvasHoveredBlock(Canvas &canvas)
+{
+    ImVec2 mouse = canvas.ScreenToWorld(ImGui::GetIO().MousePos);
+
+    for (auto it = canvas.GetBlocks().rbegin(); it != canvas.GetBlocks().rend(); ++it) {
+        const BlockInstance &block = *it;
+        if (mouse.x < block.pos.x || mouse.y < block.pos.y)
+            continue;
+        if (mouse.x > block.pos.x + block.size.x || mouse.y > block.pos.y + block.size.y)
+            continue;
+        return block.id;
+    }
+
+    return 0;
+}
+
 void UI::DrawWorkspace()
 {
     float spacingY = ImGui::GetStyle().ItemSpacing.y;
@@ -1637,6 +1769,22 @@ void UI::DrawWorkspace()
 
     g_VariablePickerVars = &m_Sidebar.GetVariables();
 
+    uint32_t canvasHovered = 0;
+    uint32_t codeHovered = 0;
+    std::unordered_set<uint32_t> highlightedBlocks;
+
+    if (m_ShowCodeView) {
+        for (auto &block : m_Canvas.GetBlocks()) {
+            if (block.parentBlockId == 0)
+                m_Canvas.MoveAttachedExpression(block);
+        }
+
+        m_CodeView.Sync(m_Canvas, m_Sidebar.GetVariables());
+        canvasHovered = findCanvasHoveredBlock(m_Canvas);
+        if (canvasHovered != 0)
+            highlightedBlocks.insert(canvasHovered);
+    }
+
     if (m_ShowCodeView) {
         if (ImGui::BeginTable(
                     "WorkspaceSplit",
@@ -1649,14 +1797,22 @@ void UI::DrawWorkspace()
             ImGui::TableSetupColumn("Code", ImGuiTableColumnFlags_WidthStretch, 0.3f);
 
             ImGui::TableNextColumn();
+            m_Canvas.SetHighlightedBlocks(highlightedBlocks);
             m_Canvas.Draw(m_EventQueue);
 
             ImGui::TableNextColumn();
-            m_CodeView.Draw();
+            m_CodeView.Draw(canvasHovered);
+            codeHovered = m_CodeView.GetHoveredBlockId();
+            if (codeHovered != 0)
+                highlightedBlocks.insert(codeHovered);
 
             ImGui::EndTable();
         }
+
+        if (!highlightedBlocks.empty())
+            drawCanvasHighlightOverlays(m_Canvas);
     } else {
+        m_Canvas.SetHighlightedBlocks({});
         m_Canvas.Draw(m_EventQueue);
     }
 
