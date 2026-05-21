@@ -315,10 +315,6 @@ void drawEmbeddedExpressionBlock(Canvas &canvas, BlockInstance &expr, ImVec2 dra
 
     if (canvas.IsBlockHighlighted(expr.id)) {
         ImDrawList *drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(
-                drawPos,
-                ImVec2(drawPos.x + expr.size.x, drawPos.y + expr.size.y),
-                BLOCK_HIGHLIGHT_FILL);
         drawList->AddRect(
                 drawPos,
                 ImVec2(drawPos.x + expr.size.x, drawPos.y + expr.size.y),
@@ -605,7 +601,6 @@ void DrawCanvasBlock(Canvas &canvas, BlockInstance &block, UIEventQueue &events)
 
     if (canvas.IsBlockHighlighted(block.id)) {
         ImDrawList *drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(screenPos, ImVec2(screenPos.x + block.size.x, screenPos.y + block.size.y), BLOCK_HIGHLIGHT_FILL);
         drawList->AddRect(screenPos, ImVec2(screenPos.x + block.size.x, screenPos.y + block.size.y), BLOCK_HIGHLIGHT_BORDER, 0.0f, 0, 2.0f);
     }
 
@@ -1404,7 +1399,9 @@ void CodeView::Draw(uint32_t hoveredCanvasBlockId)
     ApplyLineHighlights(hoveredCanvasBlockId);
 
     ImGui::BeginChild("CodeView", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SetWindowFontScale(1.5f);
     m_Editor->Render("GeneratedCode", ImVec2(0, 0), true);
+    ImGui::SetWindowFontScale(1.0f);
     ImGui::EndChild();
 
     m_HoveredBlockId = 0;
@@ -1732,7 +1729,6 @@ static void drawCanvasHighlightOverlays(Canvas &canvas)
 
         ImVec2 p0 = canvas.WorldToScreen(block.pos);
         ImVec2 p1 = ImVec2(p0.x + block.size.x, p0.y + block.size.y);
-        drawList->AddRectFilled(p0, p1, BLOCK_HIGHLIGHT_FILL);
         drawList->AddRect(p0, p1, BLOCK_HIGHLIGHT_BORDER, 0.0f, 0, 2.0f);
     }
 }
