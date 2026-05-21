@@ -841,7 +841,53 @@ void Sidebar::Draw(UIEventQueue &events)
             ImVec2(SIDEBAR_WIDTH, 0.0f),
             ImGuiChildFlags_AlwaysUseWindowPadding);
 
+    BlockCategory lastCategory = static_cast<BlockCategory>(-1);
     for (auto &block : m_Blocks) {
+        BlockCategory current = block.definition.category;
+        if (current != lastCategory) {
+            ImGui::Spacing();
+            ImGui::Separator();
+
+            ImVec4 color = ImGui::ColorConvertU32ToFloat4(
+                    getCategoryColor(current));
+
+            ImGui::PushStyleColor(ImGuiCol_Text, color);
+
+            switch (current) {
+                case BlockCategory::Event:
+                    ImGui::TextUnformatted("Events");
+                    break;
+
+                case BlockCategory::Console:
+                    ImGui::TextUnformatted("Console");
+                    break;
+
+                case BlockCategory::ControlFlow:
+                    ImGui::TextUnformatted("Control Flow");
+                    break;
+
+                case BlockCategory::Math:
+                    ImGui::TextUnformatted("Math");
+                    break;
+
+                case BlockCategory::Logic:
+                    ImGui::TextUnformatted("Logic");
+                    break;
+
+                case BlockCategory::Variable:
+                    ImGui::TextUnformatted("Variables");
+                    break;
+
+                default:
+                    ImGui::TextUnformatted("Other");
+                    break;
+            }
+
+            ImGui::PopStyleColor();
+
+            lastCategory = current;
+        }
+
         DrawSidebarBlock(block, events);
     }
 
